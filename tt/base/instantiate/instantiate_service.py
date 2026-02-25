@@ -112,24 +112,29 @@ class InstantiateService(IInstantiateService):
                 descriptor.static_arguments,
                 # descriptor.ctor(),
             )
-            return descriptor.ctor(*tuple(final_args))
+            instance = descriptor.ctor(*tuple(final_args))
+            return instance
 
         else:
             raise Exception("Not implemented yet")
 
+    def _set_created_service_instance[I: ServiceIdentifier](
+        self, identifier: Type[I], instance: object
+    ):
+        if isinstance(self._services.get(identifier), SyncDescriptor):
+            self._services.set(identifier, instance)
+
     def _get_or_create_service_instance[I: ServiceIdentifier](
         self, identifier: Type[I]
     ) -> I | SyncDescriptor[I]:
-        instance = self._services.get(identifier)
-        print("_get_or_create", type(identifier), identifier, instance)
+        ctorOrInstance = self._services.get(identifier)
 
-        if instance is None:
-            raise BaseException("[_get_or_create_service_instance]")
-
-        if isinstance(instance, SyncDescriptor):
-            return self.create_instance(instance)
-        else:
+        if isinstance(ctorOrInstance, SyncDescriptor):
+            instance = self.create_instance(ctorOrInstance)
+            self._set_created_service_instance(identifier, instance)
             return instance
+        else:
+            return ctorOrInstance
 
     @property
     def service_accessor(self) -> IServiceAccessor:
