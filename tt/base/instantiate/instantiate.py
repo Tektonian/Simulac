@@ -1,13 +1,19 @@
+from __future__ import annotations
+from inspect import signature
+from typing import TYPE_CHECKING
+
 from abc import ABC, abstractmethod
 from typing import TypeVar, Any, Type, Iterable, MutableMapping, Generic
 
+if TYPE_CHECKING:
+    from tt.base.instantiate.descriptor import SyncDescriptor
 
-T = TypeVar("T")
+I = TypeVar("I")
 
 
 class IServiceAccessor(ABC):
     @abstractmethod
-    def get(self, descriptor: Type[T]) -> T:
+    def get(self, identifier: Type[I]) -> I:
         pass
 
 
@@ -20,18 +26,23 @@ See instantiate_service.py:InstantiateService._get_service_dependencies it is no
 A = TypeVar("A", bound=ABC)
 
 
-class ServiceIdentifier(Generic[T]):
+class ServiceIdentifier:
     pass
 
 
 class _Util:
-    service_ids: MutableMapping[str, Type[ServiceIdentifier[Any]]] = {}
+    service_ids: MutableMapping[str, str] = {}
 
 
 def service_identifier(identifier: str):
 
     def wrapper[T](cls: Type[T]) -> Type[T]:
-        _Util.service_ids[cls.__name__] = cls
+        # sign = signature(cls)
+
+        key = cls.__name__
+        if identifier != key:
+            raise BaseException("No maching key")
+        _Util.service_ids[key] = identifier
         return cls
 
     return wrapper
@@ -44,8 +55,10 @@ def service_identifier(identifier: str):
 class IInstantiateService(ServiceIdentifier):
 
     @abstractmethod
-    def create_instance(
-        self, descriptor: Type[T], *non_leading_service_args: Iterable[Any]
+    def create_instance[T: ServiceIdentifier](
+        self,
+        descriptor: Type[SyncDescriptor[T]],
+        *non_leading_service_args: tuple[Iterable[Any], ...],
     ) -> T:
         pass
 

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Tuple, TypeVar, Type, Generic, MutableMapping
+from typing import List, Tuple, TypeVar, Type, Generic, MutableMapping, Any
 from abc import ABC, abstractmethod
 from inspect import isclass, signature
 
@@ -12,7 +12,7 @@ class InstantiateType(Enum):
     DELAYED = False
 
 
-_registry: List[Tuple[Type[ServiceIdentifier], SyncDescriptor]] = []
+_registry: List[Tuple[Type[ServiceIdentifier], SyncDescriptor[Any]]] = []
 
 
 def register_singleton(

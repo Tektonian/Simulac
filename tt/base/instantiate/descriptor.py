@@ -1,10 +1,10 @@
-from typing import Type, List, Any, TypeVar
+from typing import Generic, Type, List, Any, TypeVar
 from .instantiate import ServiceIdentifier
 
 T = TypeVar("T", bound=ServiceIdentifier)
 
 
-class SyncDescriptor[T]:
+class SyncDescriptor(Generic[T]):
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import Tuple, List, Type, Any, TypeVar, Type
+from typing import Generic, Iterable, Tuple, List, Type, Any, TypeVar, Type
 from abc import ABC
 
 from .descriptor import SyncDescriptor
@@ -10,6 +10,7 @@ from .service_collection import ServiceCollection
 _ENABLE_TRACING = True
 
 T = TypeVar("T")
+G = Generic[T]
 S = TypeVar("S", bound=ServiceIdentifier)
 
 
@@ -29,15 +30,32 @@ class InstantiateService(IInstantiateService):
 
         self._services.set(IInstantiateService, self)
 
-    def _get_service_dependencies(self, descriptor: SyncDescriptor):
+    def _get_service_dependencies[I: ServiceIdentifier](
+        self, descriptor: SyncDescriptor[I]
+    ):
         sign = signature(descriptor.ctor)
 
         ret: List[Tuple[Type[ServiceIdentifier], int]] = []
 
         idx = 0
-        for k, v in sign.parameters.items():
-            annotation = v.annotation
-            ret.append(annotation, idx)
+        for name, param in sign.parameters.items():
+            if name == "self":
+                continue
+            annotation = param.annotation
+            identifier = next(
+                (
+                    entry
+                    for entry in self._services._entries
+                    if entry.__name__ == annotation
+                ),
+                None,
+            )
+            if identifier is None:
+                raise Exception(f"Unresolved service dependency: {annotation}")
+            # for entry in self._services._entries:
+            #     if entry.__name__ == annotation:
+            #         identifier = entry
+            ret.append((identifier, idx))
             idx += 1
 
         return ret
@@ -45,12 +63,18 @@ class InstantiateService(IInstantiateService):
     # Lazy proxy: https://code.activestate.com/recipes/578014-lazy-load-object-proxying/
     # Proxy: https://web.archive.org/web/20220819152103/http://code.activestate.com/recipes/496741-object-proxying/
 
-    def create_instance(self, descriptor, *non_leading_service_args):
+    def create_instance[I: ServiceIdentifier](
+        self,
+        descriptor: Type[SyncDescriptor[I]],
+        *non_leading_service_args: tuple[Iterable[Any], ...],
+    ):
 
         if isinstance(descriptor, SyncDescriptor):
             service_dependencies = self._get_service_dependencies(descriptor)
-            print(service_dependencies)
-            service_args: List[Any] = []
+            print("service_dependencies", service_dependencies)
+            service_args: List[
+                ServiceIdentifier | SyncDescriptor[ServiceIdentifier]
+            ] = []
 
             service_dependencies = sorted(
                 service_dependencies, key=lambda dependency: dependency[1]
@@ -59,11 +83,13 @@ class InstantiateService(IInstantiateService):
             for dependency in service_dependencies:
                 service_identifier, _ = dependency
                 service = self._get_or_create_service_instance(service_identifier)
+                print("dependency", service, service_identifier)
                 service_args.append(service)
 
             args = descriptor.static_arguments + list(non_leading_service_args)
             first_service_arg_pos = (
-                service_dependencies[0][0]
+                # Should be service_dependencies[0][1]?
+                service_dependencies[0][1]
                 if len(service_dependencies) > 0
                 else len(args)
             )
@@ -77,23 +103,28 @@ class InstantiateService(IInstantiateService):
 
             final_args = args + service_args
             print(
+                "[createInstance]",
                 final_args,
                 args,
                 service_args,
                 descriptor,
                 descriptor.ctor,
                 descriptor.static_arguments,
-                descriptor.ctor(),
+                # descriptor.ctor(),
             )
             return descriptor.ctor(*tuple(final_args))
 
         else:
             raise Exception("Not implemented yet")
 
-    def _get_or_create_service_instance(
-        self, identifier: Type[T]
-    ) -> T | SyncDescriptor[T]:
+    def _get_or_create_service_instance[I: ServiceIdentifier](
+        self, identifier: Type[I]
+    ) -> I | SyncDescriptor[I]:
         instance = self._services.get(identifier)
+        print("_get_or_create", type(identifier), identifier, instance)
+
+        if instance is None:
+            raise BaseException("[_get_or_create_service_instance]")
 
         if isinstance(instance, SyncDescriptor):
             return self.create_instance(instance)
@@ -107,8 +138,9 @@ class InstantiateService(IInstantiateService):
 
         class ServiceAccessor(IServiceAccessor):
 
-            def get(self, descriptor: Type[T]) -> T:
-                ret = service_self._get_or_create_service_instance(descriptor)
+            def get(self, identifier: Type[T]) -> T:
+                ret = service_self._get_or_create_service_instance(identifier)
+                print("get", identifier, ret)
                 return ret
 
         accessor = ServiceAccessor()
