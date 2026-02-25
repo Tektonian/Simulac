@@ -1,6 +1,7 @@
 from .base.result.result import ResultType
-from .sdk import _simulation, Environment
+from .sdk import instantiate_service
 
-simulation = _simulation
+__all__ = []
+
 
 __version__ = "0.0.1"
