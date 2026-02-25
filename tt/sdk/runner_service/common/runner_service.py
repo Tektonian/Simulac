@@ -73,7 +73,7 @@ class RunnerManagementService(IRunnerManagementService):
         )
 
         if env_json_uri.scheme in ["http", "https"]:
-            runner_id = f"{self._ID_PREFIX}{len(self.runners) + 1}"
+            runner_id = f"{self._ID_PREFIX}{len(self.runners)}"
             runner = RemoteRunner(runner_id, env_id, {})
             self.runners.append(runner)
             return (runner_id, None)

@@ -61,7 +61,7 @@ class EnvironmentManagementService(IEnvironmentManagementService):
     ):
         url = urlsplit(env_json_uri)
 
-        env_id = f"{self._ID_PREFIX}{len(self._environments) + 1}"
+        env_id = f"{self._ID_PREFIX}{len(self._environments)}"
 
         world_ret = self.WorldManagementService.create_world(None)
 

@@ -56,7 +56,7 @@ class WorldManagementService(IWorldManagementService):
         return (None, TektonianBaseError("no world found"))
 
     def create_world(self, environments: Optional[List[IEnvironment]]):
-        world_id = f"{self._ID_PREFIX}{len(self._worlds) + 1}"
+        world_id = f"{self._ID_PREFIX}{len(self._worlds)}"
         if environments is None:
             world = IWorld(world_id, [])
             return (world, None)
