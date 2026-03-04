@@ -26,7 +26,7 @@ class GymStyleEnvironment:
         self.remote_env_id = remote_env_id
         self.benchmark_specific = benchmark_specific
 
-        # region [Libero]
+        # region FIXME: Remove later [Libero]
         self.benchmark_specific["task_name"] = remote_env_id
         self.benchmark_specific["task_id"] = 0
         self.benchmark_specific["seed"] = seed
