@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from tt.sdk.runner_service.common.physics_engine_adapter import PhysicsEngineAdapter
+
 
 @dataclass
 class IRunner(ABC):
@@ -27,3 +29,6 @@ class IRunner(ABC):
     @abstractmethod
     def render(self) -> None:
         pass
+
+    @abstractmethod
+    def create_physics_engine_adapter(self) -> PhysicsEngineAdapter: ...
