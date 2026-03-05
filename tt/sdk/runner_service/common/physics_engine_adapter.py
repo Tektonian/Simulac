@@ -1,32 +1,31 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
+
+import deprecated
 
 
 if TYPE_CHECKING:
     from tt.sdk.environment_service.common.model.entity import (
         EnvironmentMJCFObjectEntity,
     )
-    from tt.sdk.runner_service.common.runner import IRunner
+    from tt.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 
 
-class PhysicsEngineAdapter(ABC):
-
-    @abstractmethod
-    # TODO: change parameter 'object' type
-    def add_object(self, obj: EnvironmentMJCFObjectEntity) -> str:  # TODO
-        pass
+class IPhysicsEngineAdapter(ABC):
 
     @abstractmethod
-    def remove_object(self, obj_id: int) -> None:
-        pass
+    def initialize(self) -> IRunnerFactory: ...
 
     @abstractmethod
-    def start_physics_engine(self) -> None: ...
+    def start(self) -> None: ...
 
     @abstractmethod
-    def step(self, dt: float) -> None:
-        pass
+    def stop(self) -> None: ...
+
+    @abstractmethod
+    def step(self) -> None: ...
 
     @abstractmethod
     def reset(self) -> None: ...
