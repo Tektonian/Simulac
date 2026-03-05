@@ -34,7 +34,7 @@ class NewtonRunner(IRunner):
         self._step(self._world_idx, action)
 
 
-class NewtonAdapter(IPhysicsEngineAdapter, IRunnerFactory):
+class NewtonAdapter(IPhysicsEngineAdapter):
 
     def __init__(
         self,

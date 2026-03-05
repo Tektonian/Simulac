@@ -87,7 +87,7 @@ class MujocoRunner(IRunner):
         breakpoint()
 
 
-class MujocoAdapter(IPhysicsEngineAdapter, IRunnerFactory):
+class MujocoAdapter(IPhysicsEngineAdapter):
   """_summary_
       ![test](https://picsum.photos/200/300)
 
