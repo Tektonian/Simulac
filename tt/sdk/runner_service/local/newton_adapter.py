@@ -1,7 +1,5 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Iterable
-
-import newton
-import warp as wp
 
 from tt.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
@@ -14,6 +12,8 @@ if TYPE_CHECKING:
         IEnvironmentManagementService,
     )
     from tt.sdk.log_service.common.log_service import ILogService
+    import newton
+    import warp as wp
 
 
 class NewtonRunner(IRunner):
@@ -43,6 +43,12 @@ class NewtonAdapter(IPhysicsEngineAdapter):
         RunnerManagementService: IRunnerManagementService,
         EnvironmentManagementService: IEnvironmentManagementService,
     ) -> None:
+        import newton
+        import warp
+
+        self.newton = newton
+        self.warp = warp
+
         self.env_id = env_id
         self.LogService = LogService
         self.RunnerManagementService = RunnerManagementService
@@ -82,7 +88,7 @@ class NewtonAdapter(IPhysicsEngineAdapter):
             if self.model is None:
                 self.builder.replicate(self._runner_count)
                 self.model = self.builder.finalize()
-                self._solver = newton.solvers.SolverMuJoCo(self.model)
+                self._solver = self.newton.solvers.SolverMuJoCo(self.model)
                 self._state_0 = self.model.state()
                 self._state_1 = self.model.state()
                 self._control = self.model.control()
@@ -110,7 +116,7 @@ class NewtonAdapter(IPhysicsEngineAdapter):
             # Copy action into the segment using wp.copy to avoid slice assignment
             src: wp.array[wp.float32] = wp.array(action, dtype=wp.float32)
             count = s2 - s1  # == self.model.max_dofs_per_articulation
-            wp.copy(
+            self.warp.copy(
                 self._control.joint_target_pos,
                 src,
                 dest_offset=s1,
@@ -126,20 +132,17 @@ class NewtonAdapter(IPhysicsEngineAdapter):
                 1.0 / 60.0 / 4.0,  # TODO change with tick
             )
 
-
         runner = NewtonRunner(
-            env_id=self.env.id,
-            world_idx=self._runner_count
-            step=runner_step
+            env_id=self.env.id, world_idx=self._runner_count, step=runner_step
         )
-        
+
         self._runner_count += 1
-        
+
         return runner
 
     def start(self) -> None:
         self.model = self.builder.finalize()
-        self._solver = newton.solvers.SolverMuJoCo(self.model)
+        self._solver = self.newton.solvers.SolverMuJoCo(self.model)
         self._state_0 = self.model.state()
         self._state_1 = self.model.state()
         self._control = self.model.control()
