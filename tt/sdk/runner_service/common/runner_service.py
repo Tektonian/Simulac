@@ -37,8 +37,8 @@ class IRunnerManagementService(ServiceIdentifier):
         pass
 
     @abstractmethod
-    def register_physics_adapter(
-        self, adapter_types: List[str], adapter: IPhysicsEngineAdapter
+    def register_physics_adapter_factory(
+        self, adapter_types: List[str], adapter_factory: Type[IPhysicsEngineAdapter]
     ) -> None: ...
 
     @abstractmethod
@@ -49,9 +49,7 @@ class IRunnerManagementService(ServiceIdentifier):
     def remove_runner(self, runner_id: str) -> None: ...
 
     @abstractmethod
-    def create_runner(
-        self, env_id: str, /, __remote_runner_kwargs: dict[str, Any]
-    ) -> ResultType[IRunner, BaseException]:
+    def create_runner(self, env_id: str) -> ResultType[IRunner, BaseException]:
         pass
 
     @abstractmethod
@@ -102,10 +100,11 @@ class RunnerManagementService(IRunnerManagementService):
             if run.id == runner_id:
                 self.runners.remove(run)
 
-    def create_runner(self, env_id: str, /, __remote_runner_kwargs: dict[str, Any]):
+    def create_runner(self, env_id: str):
         # check adapter exist
         adapter = self.physics_adapter.get(env_id)
         if adapter is not None:
+            adapter.initialize()
             runner = adapter.create_runner()
             self.runners.append(runner)
             return (runner, None)
@@ -133,8 +132,10 @@ class RunnerManagementService(IRunnerManagementService):
                 return (None, TektonianBaseError(f"No proper adaptor for mujoco"))
 
             adapter = factory.create_physics_engine_adapter(env.id)
+            adapter.initialize()
             self.physics_adapter[env.id] = adapter
             runner = adapter.create_runner()
+            runner.initialize()
             return (runner, None)
 
         else:

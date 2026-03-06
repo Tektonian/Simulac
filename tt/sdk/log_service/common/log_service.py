@@ -53,7 +53,6 @@ class ILogService(ServiceIdentifier):
 class LogService(ILogService):
 
     def __init__(self):
-        super().__init__()
         self.logger: structlog.stdlib.BoundLogger = structlog.get_logger()
         self.level = DEFAULT_LOG_LEVEL
 

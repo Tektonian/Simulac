@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from tt.sdk.runner_service.common.physics_engine_adapter import IPhysicsEngineAdapter
-
 
 @dataclass
 class IRunner(ABC):

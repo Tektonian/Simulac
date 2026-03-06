@@ -13,15 +13,15 @@ if TYPE_CHECKING:
 
 class IPhysicsEngineAdapterFactory(ABC):
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def create_physics_engine_adapter(env_id: str) -> IPhysicsEngineAdapter: ...
 
 
 class IPhysicsEngineAdapter(IRunnerFactory, ABC):
 
     @abstractmethod
-    def initialize(self) -> IRunnerFactory: ...
+    def initialize(self) -> None: ...
 
     @abstractmethod
     def start(self) -> None: ...
