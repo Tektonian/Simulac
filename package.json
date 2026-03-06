@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@commitlint/cli": "^20.4.3",
-    "@commitlint/config-conventional": "^20.4.3"
+    "@commitlint/config-conventional": "^20.4.3",
+    "release-please": "^17.3.0"
   }
 }
