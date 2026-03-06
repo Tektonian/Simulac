@@ -116,7 +116,10 @@ class InstantiateService(IInstantiateService):
             return instance
 
         else:
-            raise Exception("Not implemented yet")
+            if len(non_leading_service_args) == 0:
+                return descriptor()
+            else:
+                raise Exception("Not implemented yet")
 
     def _set_created_service_instance[I: ServiceIdentifier](
         self, identifier: Type[I], instance: object
