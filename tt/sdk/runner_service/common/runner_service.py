@@ -1,5 +1,5 @@
 from __future__ import annotations  # 3.7+ 에서 필요
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Tuple, Type
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -12,10 +12,18 @@ from tt.base.result.result import ResultType
 from tt.sdk.environment_service.common.environment_service import (
     IEnvironmentManagementService,
 )
+from tt.sdk.runner_service.common.physics_engine_adapter import (
+    IPhysicsEngineAdapter,
+    IPhysicsEngineAdapterFactory,
+)
 from tt.sdk.runner_service.remote.runner import RemoteRunner
 
 if TYPE_CHECKING:
     from .runner import IRunner
+    from tt.sdk.runner_service.common.physics_engine_adapter import (
+        IPhysicsEngineAdapter,
+    )
+    from tt.sdk.log_service.common.log_service import ILogService
 
 
 @service_identifier("IRunnerManagementService")
@@ -29,6 +37,11 @@ class IRunnerManagementService(ServiceIdentifier):
         pass
 
     @abstractmethod
+    def register_physics_adapter_factory(
+        self, adapter_types: List[str], adapter_factory: Type[IPhysicsEngineAdapter]
+    ) -> None: ...
+
+    @abstractmethod
     def get_runner(self, runner_id: str) -> ResultType[IRunner, BaseException]:
         pass
 
@@ -36,9 +49,7 @@ class IRunnerManagementService(ServiceIdentifier):
     def remove_runner(self, runner_id: str) -> None: ...
 
     @abstractmethod
-    def create_runner(
-        self, env_id: str, /, __remote_runner_kwargs: dict[str, Any]
-    ) -> ResultType[IRunner, BaseException]:
+    def create_runner(self, env_id: str) -> ResultType[IRunner, BaseException]:
         pass
 
     @abstractmethod
@@ -48,14 +59,35 @@ class IRunnerManagementService(ServiceIdentifier):
 
 class RunnerManagementService(IRunnerManagementService):
     def __init__(
-        self, EnvironmentManagementService: IEnvironmentManagementService
+        self,
+        EnvironmentManagementService: IEnvironmentManagementService,
+        LogService: ILogService,
     ) -> None:
         self.EnvironmentManagementService = EnvironmentManagementService
+        self.LogService = LogService
         self.runners: List[IRunner] = []
+        self.physics_adapter: MutableMapping[str, IPhysicsEngineAdapter] = (
+            {}
+        )  # env_id: adapter
+        self.physics_adapter_factory: MutableMapping[  # engine: adapter_factory // e.g., {"mujoco": MujocoAdapter}
+            str, Type[IPhysicsEngineAdapterFactory]
+        ] = {}
 
     @property
     def _runners(self) -> List[IRunner]:
         return self.runners
+
+    def register_physics_adapter_factory(
+        self,
+        adapter_types: List[str],
+        adapter_factory: Type[IPhysicsEngineAdapterFactory],
+    ) -> None:
+        for adapter_type in adapter_types:
+            if adapter_type in self.physics_adapter_factory:
+                self.LogService.warn(
+                    f'Replace physics adapter type of "{adapter_type}" {self.physics_adapter_factory[adapter_type]} into {adapter_factory}'
+                )
+            self.physics_adapter_factory[adapter_type] = adapter_factory
 
     def get_runner(self, runner_id: str):
         for run in self.runners:
@@ -68,19 +100,47 @@ class RunnerManagementService(IRunnerManagementService):
             if run.id == runner_id:
                 self.runners.remove(run)
 
-    def create_runner(self, env_id: str, /, __remote_runner_kwargs: dict[str, Any]):
-        ret = self.EnvironmentManagementService.get_environment(env_id)
+    def create_runner(self, env_id: str):
+        # check adapter exist
+        adapter = self.physics_adapter.get(env_id)
+        if adapter is not None:
+            adapter.initialize()
+            runner = adapter.create_runner()
+            self.runners.append(runner)
+            return (runner, None)
 
-        if ret[0] is None:
-            return (None, ret[1])
+        env_ret = self.EnvironmentManagementService.get_environment(env_id)
 
-        env = ret[0]
+        if env_ret[0] is None:
+            return (None, env_ret[1])
 
+        env = env_ret[0]
+
+        # region TODO: move initialization code -> use IPhysicsEngineAdapterFactory
         env_json_uri = (
             urlsplit(env.env_json_uri)
             if isinstance(env.env_json_uri, str)
             else env.env_json_uri
         )
+
+        if env_json_uri.scheme in ["http", "https"]:
+            pass
+
+        if env.physics_engine == "mujoco" or env.physics_engine == "newton":
+            factory = self.physics_adapter_factory.get(env.physics_engine)
+            if factory is None:
+                return (None, TektonianBaseError(f"No proper adaptor for mujoco"))
+
+            adapter = factory.create_physics_engine_adapter(env.id)
+            adapter.initialize()
+            self.physics_adapter[env.id] = adapter
+            runner = adapter.create_runner()
+            runner.initialize()
+            return (runner, None)
+
+        else:
+            return (None, TektonianBaseError(f"No proper adaptor for {env}"))
+        # end-region
 
         if env_json_uri.scheme in ["http", "https"]:
             runner_id = f"{self._ID_PREFIX}{len(self.runners)}"

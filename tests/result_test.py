@@ -4,6 +4,182 @@ import time
 
 from tt.lib.gym_style import init_bench
 
+# region User Interface example
+from tt.lib.world_maker import Runner, World, Environment, Stuff, Robot
+
+from tt.sdk import environment_management_service, runner_management_service
+from tt.sdk.environment_service.common.model.component import (
+    MJCFPhysicsComponent,
+    RenderingComponent,
+)
+from tt.sdk.environment_service.common.model.entity import EnvironmentMJCFObjectEntity
+
+
+def test_world_build():
+    env_ret = environment_management_service.create_environment("", "", "", 0)
+    assert env_ret[0] is not None
+
+    env = env_ret[0]
+
+    ren_entity = RenderingComponent("", "")
+    physc_entity = MJCFPhysicsComponent("tt/asset/test/Basket/Basket026/model.xml")
+    entity = EnvironmentMJCFObjectEntity(rendering=ren_entity, physics=physc_entity)
+
+    environment_management_service.add_entity(env.id, entity)
+    ren_entity = RenderingComponent("", "")
+    physc_entity = MJCFPhysicsComponent(
+        "tt/asset/test/CheeseGrater/CheeseGrater002/model.xml"
+    )
+    entity = EnvironmentMJCFObjectEntity(rendering=ren_entity, physics=physc_entity)
+    entity.pos = (1, 0, 0)
+    environment_management_service.add_entity(env.id, entity)
+
+    runner_env = runner_management_service.create_runner(
+        env.id,
+    )
+
+    assert runner_env[0] is not None
+
+    runner = runner_env[0]
+
+    runner.step([])
+
+    runner.render()
+
+
+def test_world_make_example():
+
+    class MockUserPolicy: ...
+
+    user_policy = MockUserPolicy()
+
+    # region When use prebuilt environment
+
+    def mock_env_to_gym_env(env: Environment): ...
+
+    env = Environment("server-side-house-pick-up-sausage-task")
+
+    gym_env = mock_env_to_gym_env(env)
+
+    ## Use env as gym style
+
+    obs, info = gym_env.reset(0)
+
+    for _ in range(100):
+        action = user_policy.inference(obs)
+        obs, reward, terminate, truncated, info = gym_env.step(action)
+
+    # end-region
+
+    # region When user want to build their own environment
+
+    env = Environment()
+
+    ## remote assets
+    franka = Robot("franka")
+    basket = Stuff("basket.0")
+    block = Stuff("block.0")
+    ## local asssets location
+    sausage = Stuff("~/assets/sausage.xml")
+
+    franka_obj = env.place_robot_entity(franka)
+
+    TICK = 5  # 5ms
+    run = Runner(env, tick=TICK)
+    state = env.get_state()
+
+    for _ in range(10):
+        action = user_policy.inference(state)
+        franka_obj.set_target_position(action)
+        state = run.tick()
+
+    # end-region
+
+    # region when user want randomization
+
+    env = Environment()
+
+    franka = Robot("franka")
+    basket = Stuff("basket.0")
+
+    franka_obj = env.place_robot_entity(franka)
+    basket_obj = env.place_entity(basket)
+
+    ## If user want change stuff's physical attributes
+    basket_obj.set_friction(1.0)
+    ## or random value
+    import random
+
+    random_mass = random.random(0)
+    basket_obj.set_mass(random_mass)
+
+    for _ in range(10):
+        action = user_policy.inference(state)
+        franka_obj.set_target_position(action)
+        state = run.tick()
+
+    # end-region
+
+    # region when user want to make parallel world
+
+    ## If user want parallel execution of remote environments
+    libero_env0 = Environment("libero_10/KITCHEN_SCENE3")
+
+    libero_env1 = Environment("libero_10/KITCHEN_SCENE2")
+
+    practice_pick_cube_env = Environment("./somewhare/env.json")
+
+    world = World()
+
+    ## For run benchmark parallel
+    world.place_env(libero_env0, 1)
+    world.place_env(libero_env1, 1)
+
+    ## For learning or testing
+    world.place_env(practice_pick_cube_env, 1024)
+
+    states = world.get_state()
+
+    for _ in range(10):
+        actions = []
+        for state in states:
+            action = user_policy.inference(state)
+            actions.append(action)
+
+        states = world.step(actions)
+
+    # end-region
+
+    # region when user want async inference
+
+    env = Environment()
+
+    franka = Robot("franka")
+    basket = Stuff("basket.0")
+
+    franka_obj = env.place_robot_entity(franka)
+    basket_obj = env.place_entity(basket)
+
+    TICK = 5  # 5ms
+    run = Runner(env, tick=TICK)
+    state = env.get_state()
+    import time
+    for _ in range(10):
+        start_ms = round(time.clock_gettime() * 1000)
+        action = user_policy.inference(state)
+        end_ms = round(time.time() * 1000)
+        
+        for _ in range((end_ms - start_ms) // TICK)
+            state = run.tick()
+            
+        franka_obj.set_target_position(action)
+    # end-region
+
+    # region when user want async inference with multi agent -> Not implemented yet
+
+    # end-region
+# end-region
+
 
 def test_result_type():
     env = init_bench(

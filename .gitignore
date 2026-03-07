@@ -2,6 +2,10 @@ build/**
 
 tektonian_python.egg-info/**
 
+node_modules/
+!.husky
+package-lock.json
+
 # Virtual env
 venv/**
 .venv

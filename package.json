@@ -1,0 +1,29 @@
+{
+  "name": "tektonian-python",
+  "version": "0.0.1",
+  "description": "This npm package is for husky, commitlint, and elses related with repository managing. It's for developer only",
+  "main": ".",
+  "directories": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tektonian/tektonian-python.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Tektonian/tektonian-python/issues"
+  },
+  "homepage": "https://github.com/Tektonian/tektonian-python#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "dependencies": {
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
+    "release-please": "^17.3.0"
+  }
+}
