@@ -1,18 +1,43 @@
-# [build-system]
-# requires = [
-#     # "hatchling",
-#     "typing_extensions"
-# ]
-# build-backend = "hatchling.build"
+#[build-system]
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
 
 [project]
 name = "tektonian-python"
 dynamic = ["version"]
 description = "A CLI, library, and local server for interacting with the Tektonian backend."
-authors = []
+authors = [
+    {name = "Jeuk Kang", email = "gangjeuk@tektonian.com"}
+]
+keywords = [
+    "robotics",
+    "robot-simulation",
+    "simulation",
+    "physics-engine",
+    "mujoco",
+    "newton",
+    "genesis",
+    "mjcf",
+    "urdf",
+    "usd",
+]
 readme = "README.md"
-license = { file = "LICENSE" }
 requires-python = ">=3.10"
+classifiers = [
+    # How mature is this project? Common values are
+    #   3 - Alpha
+    #   4 - Beta
+    #   5 - Production/Stable
+    "Development Status :: 3 - Alpha",
+
+    # Indicate who your project is intended for
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+
+    # Specify the Python versions you support here.
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
 dependencies = [
     "requests>=2.0.0,<3",
     "PyYAML",
@@ -31,10 +56,39 @@ dependencies = [
     "structlog>=25.5.0",
     "posthog>=7.8.5",
     "json-numpy>=2.1.1",
+    "mujoco>=3.5.0",
+]
+
+[project.urls]
+Homepage = "https://tektonian.com"
+Repository = "https://github.com/Tektonian/tektonian-python"
+
+[project.optional-dependencies]
+genesis = [
+    "genesis-world==0.3.12",
+    "torch>=2.10.0",
+]
+
+newton = [
+    "newton>=1.0.0rc",
+    "warp-lang>=1.12.0",
+    "mujoco-warp>=3.5.0.2",
 ]
 
 [dependency-groups]
 dev = [
     "mypy==1.15.0",
     "pylint==3.3.4",
+    "ruff>=0.15.5",
 ]
+
+[tool.ruff.lint]
+select = ["E", "F", "I002", "TC004"]
+ignore = ["F401"]
+
+[lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+
+[tool.setuptools]
+py-modules = []
