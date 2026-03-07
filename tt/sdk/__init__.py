@@ -1,3 +1,5 @@
+from typing import Any
+
 from tt.base.instantiate.extensions import (
     register_singleton,
     get_singleton_service_descriptors,
@@ -17,6 +19,8 @@ from tt.sdk.runner_service.common.runner_service import (
     IRunnerManagementService,
     RunnerManagementService,
 )
+from tt.sdk.runner_service.local.mujoco_adapter import MujocoAdapter
+from tt.sdk.runner_service.local.newton_adapter import NewtonAdapter
 from tt.sdk.runner_service.remote.remote_adapter import RemoteAdapter
 from tt.sdk.simulation_service.common.simulation_service import (
     ISimulationManagementService,
@@ -26,9 +30,6 @@ from tt.sdk.world_service.common.world_service import (
     IWorldManagementService,
     WorldManagementService,
 )
-
-from tt.sdk.runner_service.local.mujoco_adapter import MujocoAdapter
-from tt.sdk.runner_service.local.newton_adapter import NewtonAdapter
 
 register_singleton(ILogService, LogService)
 register_singleton(ISimulationManagementService, SimulationManagementService)
@@ -63,7 +64,7 @@ class MujocoAdapterFactory(IPhysicsEngineAdapterFactory):
         )
 
 
-runner_management_service.register_physics_adapter(
+runner_management_service.register_physics_adapter_factory(
     ["mujoco"],
     instantiate_service.create_instance(
         MujocoAdapterFactory,
@@ -79,10 +80,11 @@ class NewtonAdapterFactory(IPhysicsEngineAdapterFactory):
             env_id,
             log_service,
             runner_management_service,
+            environment_management_service,
         )
 
 
-runner_management_service.register_physics_adapter(
+runner_management_service.register_physics_adapter_factory(
     ["newton"],
     instantiate_service.create_instance(
         NewtonAdapterFactory,
