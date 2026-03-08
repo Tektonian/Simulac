@@ -48,11 +48,24 @@ class RemoteRunner(IRunner):
         msg = json.dumps({"command": "build_env", "args": self.kwargs})
         print(msg)
         self._socket.send(msg)
-        recv = self._socket.recv()
-        # print(recv)
+        self.recv = self._socket.recv()
+
+    def _to_jsonable(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: self._to_jsonable(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self._to_jsonable(v) for v in value]
+        if hasattr(value, "detach") and callable(value.detach):
+            return self._to_jsonable(value.detach().cpu().tolist())
+        if hasattr(value, "tolist") and callable(value.tolist):
+            return value.tolist()
+        if hasattr(value, "item") and callable(value.item):
+            return value.item()
+        return value
 
     def step(self, action: object) -> object:
-        self._socket.send(json.dumps({"command": "step", "args": {"action": action}}))
+        payload = {"command": "step", "args": {"action": self._to_jsonable(action)}}
+        self._socket.send(json.dumps(payload))
 
         recv = self._socket.recv()
         # print(recv)
