@@ -1,0 +1,13 @@
+task_name: libero_10
+episodes_per_task_id: 1
+task_id 0: 0.000000
+task_id 1: 0.000000
+task_id 2: 0.000000
+task_id 3: 0.000000
+task_id 4: 0.000000
+task_id 5: 0.000000
+task_id 6: 0.000000
+task_id 7: 0.000000
+task_id 8: 0.000000
+task_id 9: 0.000000
+average_success_rate: 0.000000

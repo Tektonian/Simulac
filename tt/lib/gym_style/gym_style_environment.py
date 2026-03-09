@@ -29,7 +29,7 @@ class GymStyleEnvironment:
         # region [Libero]
         # TODO: mapping task_name to task_id
         self.benchmark_specific["task_name"] = remote_env_id
-        self.benchmark_specific["task_id"] = 0
+        # self.benchmark_specific["task_id"] = 0
         self.benchmark_specific["seed"] = seed
         # endregion
 

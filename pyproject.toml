@@ -31,6 +31,8 @@ dependencies = [
     "structlog>=25.5.0",
     "posthog>=7.8.5",
     "json-numpy>=2.1.1",
+    "ipdb>=0.13.13",
+    "lerobot[smolvla]>=0.4.3",
 ]
 
 [dependency-groups]
