@@ -79,8 +79,15 @@ class NewtonAdapter(IPhysicsEngineAdapter):
         objects = self.env.objects
 
         for obj in objects:
+            print(obj.physics.mjcf_uri)
+
+            # if "franka" in obj.physics.mjcf_uri:
+            #     self.builder.add_urdf(obj.physics.mjcf_uri)
+            # else:
             # TODO: URDF file is not handled here. Need handling code
-            self.builder.add_urdf(obj.physics.mjcf_uri, xform=(obj.pos + obj.quat))
+            self.__scene.add_mjcf(obj.physics.mjcf_uri, xform=(obj.pos + obj.quat))
+
+    def initialize(self) -> None: ...
 
     def create_runner(self) -> IRunner:
 
