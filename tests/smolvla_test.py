@@ -1,222 +1,58 @@
-from abc import ABC
-import random
-import time
-
-from tt.lib.gym_style import init_bench
-
 import os
-import torch
-from lerobot.policies.factory import make_pre_post_processors
-from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
-import numpy as np
 import time
-import json
-import imageio
-import cv2
 import math
 
-def test_result_type():
-    device = torch.device("mps")  # Set device to Apple Silicon GPU
-    # Load SmolVLA policy from HuggingFace ------------------
-    MODEL_ID = "HuggingFaceVLA/smolvla_libero"
-    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # Avoid tokenizer parallelism warning
-    patch_draccus_non_callable_types()
+import torch
+import numpy as np
+import imageio
+import cv2
 
-    policy = SmolVLAPolicy.from_pretrained(MODEL_ID).to(device).eval()  # Load and prepare policy
-    preprocess, postprocess = make_pre_post_processors(
-        policy.config,
-        MODEL_ID,
-        preprocessor_overrides={"device_processor": {"device": str(device)}},
-    )
-    
-    # -------------------------------------------------------
-    # NOTE: Benchmark 특성상 task_name을 하나하나 쓰는 것은 귀찮; "libero_10" 정도로 묶어서 쓰는 방법도 고려
-    # NOTE: Libero 안에서 libero_10 : task_suite; 하부 작업들이 그밑으로 정의되는 idx
-    # NOTE: camera resolution은 고해상도로 해두고 필요에 따라 downsample하는 방식이 좋을듯 (ex: 1280x720 -> 640x360) -> SmolVLA는 224x224로 resize해서 쓰도록 preprocessor에서 처리
-    task_suites = ["libero_spatial", "libero_object", "libero_goal", "libero_10"] #, "libero_90"]
-    suite_task_counts = {
-        "libero_spatial": 10,
-        "libero_object": 10,
-        "libero_goal": 10,
-        "libero_10": 10,
-        "libero_90": 90,
-    }
-    benchmark_start_time = time.perf_counter()
-    all_task_success_rates = []
-    N_CHUNK = 10
-    num_steps_wait = 10  # Number of initial steps to wait before feeding observations to the policy
-    LIBERO_DUMMY_ACTION = [0.0] * 6 + [-1.0]
+from tt.lib.gym_style import init_bench
+from lerobot.policies.factory import make_pre_post_processors
+from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 
-    for task_suite_name in task_suites:
-        env = init_bench(
-            "Tektonian/Libero",
-            task_suite_name+'/...',
-            0,
-            benchmark_specific={"control_mode": "ee_pose"},
-        )
-
-        if task_suite_name == "libero_spatial":
-            max_steps = 220  # longest training demo has 193 steps
-        elif task_suite_name == "libero_object":
-            max_steps = 280  # longest training demo has 254 steps
-        elif task_suite_name == "libero_goal":
-            max_steps = 300  # longest training demo has 270 steps
-        elif task_suite_name == "libero_10":
-            max_steps = 520  # longest training demo has 505 steps
-        elif task_suite_name == "libero_90":
-            max_steps = 400  # longest training demo has 373 steps
-
-        max_episodes = 50  # Number of episodes to run per task_id
-        task_success_rates = []
-        for task_id in range(suite_task_counts[task_suite_name]):
-            env.benchmark_specific["task_id"] = task_id  # Update task_id for each episode if needed
-            task_successes = 0
-            for episode in range(max_episodes):
-                obs, info = env.reset(seed=episode)  # Reset environment for new episode
-                lang = info['task_description']
-                frames = []
-                start_time = time.perf_counter()
-                steps = 0
-                done = False
-                while steps < max_steps + num_steps_wait:
-                    if steps < num_steps_wait:
-                        obs, reward, done, info = env.step(LIBERO_DUMMY_ACTION)
-                        steps += 1
-                        continue
-                    # Preprocess observation for the policy
-                    # import ipdb; ipdb.set_trace()
-                    batch_input = libero_to_smolvla_obs(obs, lang, device)
-                    batch = preprocess(batch_input)
+# Constants
+N_CHUNK = 10
+NUM_STEPS_WAIT = 10
+LIBERO_DUMMY_ACTION = [0.0] * 6 + [-1.0]
+TASK_SUITES = ["libero_spatial", "libero_object", "libero_goal", "libero_10"]
+SUITE_TASK_COUNTS = {suite: 10 for suite in TASK_SUITES}
+SUITE_TASK_COUNTS["libero_90"] = 90
+MAX_STEPS_PER_SUITE = {
+    "libero_spatial": 220,
+    "libero_object": 280,
+    "libero_goal": 300,
+    "libero_10": 520,
+    "libero_90": 400,
+}
 
 
-                    # Get action from policy
-                    with torch.inference_mode():
-                        if N_CHUNK == 1:
-                            pred_action = policy.select_action(batch)
-                        else:
-                            if steps % N_CHUNK == 0:
-                                count = 0
-                                pred_action_chunk = policy.predict_action_chunk(batch)
-                                pred_action = pred_action_chunk[:,count]
-                            else:
-                                count += 1
-                                pred_action = pred_action_chunk[:,count]
-                        
-                    
-                    # Save the agentview image for GIF
-                    agentview_img = obs['agentview_image']
-                    # Convert to uint8 if needed
-                    if agentview_img.dtype != np.uint8:
-                        agentview_img = (agentview_img * 255).astype(np.uint8) if agentview_img.max() <= 1.0 else agentview_img.astype(np.uint8)
-                    frames.append(agentview_img)
-
-                    # Postprocess action and step environment
-                    action = postprocess(pred_action)
-                    obs, reward, done, info = env.step(action)
-
-                    steps += 1
-                    print(f"{task_suite_name} Episode {episode + 1} Step {steps} reward: {reward} done: {done} info: {info}")
-
-                    if done:
-                        task_successes += 1
-                        break
-
-                end_time = time.perf_counter()
-
-                gif_path = f"tests/videos/{task_suite_name}_task_{task_id}_ep_{episode}_{done}.gif"
-                # turn 180 degree for better visualization
-                frames = [np.rot90(frame, k=2) for frame in frames]
-                # add lang info on the top of each frame
-                frames = [np.pad(frame, ((30, 0), (0, 0), (0, 0)), mode='constant', constant_values=255) for frame in frames]
-                # Add lang info on the top of each frame with a smaller font, split into two lines if too long
-                max_line_length = 50
-                lang_lines = [lang[i:i+max_line_length] for i in range(0, len(lang), max_line_length)]
-                for i, frame in enumerate(frames):
-                    for j, line in enumerate(lang_lines[:2]):  # Only two lines
-                        y = 9 + j * 9  # 18 pixels apart
-                        cv2.putText(
-                            frame,
-                            line,
-                            (10, y),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.25,  # smaller font scale
-                            (0, 0, 0),
-                            1,
-                            cv2.LINE_AA
-                        )
-                
-                imageio.mimsave(gif_path, frames, fps=10)
-                print(f"Saved agentview GIF to {gif_path}")
-
-            # Calculate and print per-task_id success rate
-            success_rate = task_successes / max_episodes
-            task_success_rates.append(success_rate)
-            print(f"{task_suite_name} task_id={task_id} success rate: {success_rate:.2%} ({task_successes}/{max_episodes})")
-
-        avg_success_rate = sum(task_success_rates) / len(task_success_rates)
-        all_task_success_rates.extend(task_success_rates)
-        result_path = f"tests/smolvla_{task_suite_name.replace('/', '_')}_results.txt"
-        with open(result_path, "w", encoding="utf-8") as f:
-            f.write(f"task_suite_name: {task_suite_name}\n")
-            f.write(f"episodes_per_task_id: {max_episodes}\n")
-            for task_id, rate in enumerate(task_success_rates):
-                f.write(f"task_id {task_id}: {rate:.6f}\n")
-            f.write(f"average_success_rate: {avg_success_rate:.6f}\n")
-
-        print(f"Saved results to {result_path}")
-        env.close()  # Clean up environment
-        
-    elapsed = time.perf_counter() - benchmark_start_time
-    overall_success_rate = sum(all_task_success_rates) / len(all_task_success_rates)
-    print(
-        f"elapsed: {elapsed:.3f}s, success rate: {overall_success_rate:.2%}"
-    )  # about 3~4 seconds vcpu: 1~1.2 vcpu ram: 3.4GB / 2 instances -> 1.6 vcpu  same ram / 3 instances -> crash
-    # 100 steps, in ours: elapsed: 19.06359601020813
-    # 100 steps, in docker only: elapsed: 16.273049116134644
-    # TODO: step time이 너무 긴데, 원인 분석 필요 (1) Tektonian API 통신 오버헤드? (2) Libero 시뮬레이터 자체의 느린 시뮬레이션 속도? (3) 기타 원인? -> step time breakdown 분석 필요
+def process_frames(frames, lang):
+    """Rotate, pad, and overlay text on frames."""
+    frames = [np.rot90(frame, k=2) for frame in frames]
+    frames = [np.pad(frame, ((30, 0), (0, 0), (0, 0)), mode='constant', constant_values=255) for frame in frames]
+    max_line_length = 50
+    lang_lines = [lang[i:i + max_line_length] for i in range(0, len(lang), max_line_length)]
+    for frame in frames:
+        for j, line in enumerate(lang_lines[:2]):
+            y = 9 + j * 9
+            cv2.putText(
+                frame,
+                line,
+                (10, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.25,
+                (0, 0, 0),
+                1,
+                cv2.LINE_AA
+            )
+    return frames
 
 
-    assert 1 == True
-
-    return
-
-    init_bench(
-        "Tektonian/Bigym",
-        "MovePlates",
-        0,
-        env_specific={"floating_base": True, "control_frequency": 50},
-    )
-
-    # "assembly-v3","basketball-v3","bin-picking-v3","box-close-v3","button-press-topdown-v3","button-press-topdown-wall-v3","button-press-v3","button-press-wall-v3","coffee-button-v3","coffee-pull-v3","coffee-push-v3","dial-turn-v3","disassemble-v3","door-close-v3","door-lock-v3","door-open-v3","door-unlock-v3","hand-insert-v3","drawer-close-v3","drawer-open-v3","faucet-open-v3","faucet-close-v3","hammer-v3","handle-press-side-v3","handle-press-v3","handle-pull-side-v3","handle-pull-v3","lever-pull-v3","pick-place-wall-v3","pick-out-of-hole-v3","pick-place-v3","plate-slide-v3","plate-slide-side-v3","plate-slide-back-v3","plate-slide-back-side-v3","peg-insert-side-v3","peg-unplug-side-v3","soccer-v3","stick-push-v3","stick-pull-v3","push-v3","push-wall-v3","push-back-v3","reach-v3","reach-wall-v3","shelf-place-v3","sweep-into-v3","sweep-v3","window-open-v3","window-close-v3",
-    # camera_name = '' # one of: ['corner', 'corner2', 'corner3', 'corner4', 'topview', 'behindGripper', 'gripperPOV']
-    init_bench("Tektonian/Metaworld", "assembly-v3", 0, env_specific={})
-
-    init_bench("Tektonian/Calvin", "A")
-
-    init_bench(
-        "Tektonian/Robosuite",
-        "assembly-v3",
-        0,
-        env_specific={
-            """
-            Robot, GripperTypes는 default로 설정되도록?
-            """
-            "robots": [],  # ["Sawyer", "Panda"] https://github.com/ARISE-Initiative/robosuite/blob/6c10ef24a4bb52f59199976125060ce793470e6e/robosuite/robots/__init__.py#L15
-            "gripper_types": ["PandaGripper", "RethinkGripper"],
-            "env_configuration": "opposed",  # "opposed" | "parallel"
-        },
-    )
-
-
-def patch_draccus_non_callable_types() -> None:
-    """
-    Python 3.14에서 argparse가 non-callable `type=`(예: Dict[...] | None)을
-    엄격히 거부해서 draccus config 파싱이 깨지는 문제를 우회한다.
-    """
+def patch_draccus_non_callable_types():
+    """Patch for draccus to handle non-callable types."""
     try:
         from draccus.wrappers.field_wrapper import FieldWrapper
-
-
     except Exception:
         return
 
@@ -235,46 +71,160 @@ def patch_draccus_non_callable_types() -> None:
     FieldWrapper.get_arg_options = _patched_get_arg_options
     FieldWrapper._tektonian_py314_patch = True
 
-def libero_to_smolvla_obs(obs, lang, device) -> dict:
-    # ref: https://huggingface.co/docs/lerobot/en/env_processor
-    # Extract components similar to _process_observation
-    eef_pos = torch.tensor(obs['robot0_eef_pos'], device=device, dtype=torch.float32)  # 3D
-    quat = torch.tensor(obs['robot0_eef_quat'], device=device, dtype=torch.float32)    # 4D
-    # Convert quaternion to axis-angle
+
+def libero_to_smolvla_obs(obs, lang, device):
+    """Convert libero observation to smolvla input format."""
+    eef_pos = torch.tensor(obs['robot0_eef_pos'], device=device, dtype=torch.float32)
+    quat = torch.tensor(obs['robot0_eef_quat'], device=device, dtype=torch.float32)
+
     def _quat2axisangle(quat):
-        """
-        Copied from robosuite: https://github.com/ARISE-Initiative/robosuite/blob/eafb81f54ffc104f905ee48a16bb15f059176ad3/robosuite/utils/transform_utils.py#L490C1-L512C55
-        """
-        # clip quaternion
-        if quat[3] > 1.0:
-            quat[3] = 1.0
-        elif quat[3] < -1.0:
-            quat[3] = -1.0
-
-        den = torch.sqrt(1.0 - quat[3] * quat[3])
-        if math.isclose(den, 0.0):
-            # This is (close to) a zero degree rotation, immediately return
+        q = quat.clone()
+        q[3] = max(min(q[3], 1.0), -1.0)
+        den = torch.sqrt(1.0 - q[3] * q[3])
+        if math.isclose(den.item(), 0.0):
             return torch.zeros(3, device=device, dtype=torch.float32)
+        return (q[:3] * 2.0 * math.acos(q[3].item())) / den
 
-        return torch.tensor((quat[:3] * 2.0 * math.acos(quat[3])) / den, device=device, dtype=torch.float32)
-
-    eef_axisangle = _quat2axisangle(quat)  # 3D
-    gripper = torch.tensor(obs['robot0_gripper_qpos'], device=device, dtype=torch.float32)  # 2D
-    state = torch.cat([eef_pos, eef_axisangle, gripper], dim=-1)  # 8D
-    
+    eef_axisangle = _quat2axisangle(quat)
+    gripper = torch.tensor(obs['robot0_gripper_qpos'], device=device, dtype=torch.float32)
+    state = torch.cat([eef_pos, eef_axisangle, gripper], dim=-1)
 
     def normalize_image(img):
         img = torch.tensor(img, device=device, dtype=torch.float32) / 255.0
-        if img.ndim == 3 and img.shape[2] == 3:  # HWC
-            img = img.permute(2, 0, 1)  # CHW
+        if img.ndim == 3 and img.shape[2] == 3:
+            img = img.permute(2, 0, 1)
         return img
+
     agentview_img = normalize_image(obs['agentview_image'])
     eye_in_hand_img = normalize_image(obs['robot0_eye_in_hand_image'])
-
-    # import ipdb; ipdb.set_trace()
     return {
         "observation.images.image": agentview_img,
         "observation.images.image2": eye_in_hand_img,
         "observation.state": state,
         "task": lang,
     }
+
+
+def run_task_suite(policy, preprocess, postprocess, device, task_suite_name):
+    env = init_bench(
+        "Tektonian/Libero",
+        f"{task_suite_name}/...",
+        0,
+        benchmark_specific={"control_mode": "ee_pose"},
+    )
+    max_steps = MAX_STEPS_PER_SUITE[task_suite_name]
+    max_episodes = 50
+    task_success_rates = []
+
+    for task_id in range(SUITE_TASK_COUNTS[task_suite_name]):
+        env.benchmark_specific["task_id"] = task_id
+        task_successes = 0
+
+        for episode in range(max_episodes):
+            obs, info = env.reset(seed=episode)
+            lang = info['task_description']
+            frames = []
+            steps = 0
+            done = False
+            count = 0
+            pred_action_chunk = None
+
+            while steps < max_steps + NUM_STEPS_WAIT:
+                if steps < NUM_STEPS_WAIT:
+                    obs, reward, done, info = env.step(LIBERO_DUMMY_ACTION)
+                    steps += 1
+                    continue
+
+                batch_input = libero_to_smolvla_obs(obs, lang, device)
+                batch = preprocess(batch_input)
+
+                with torch.inference_mode():
+                    if N_CHUNK == 1:
+                        pred_action = policy.select_action(batch)
+                    else:
+                        if steps % N_CHUNK == 0:
+                            count = 0
+                            pred_action_chunk = policy.predict_action_chunk(batch)
+                            pred_action = pred_action_chunk[:, count]
+                        else:
+                            count += 1
+                            pred_action = pred_action_chunk[:, count]
+
+                agentview_img = obs['agentview_image']
+                if agentview_img.dtype != np.uint8:
+                    agentview_img = (agentview_img * 255).astype(np.uint8) if agentview_img.max() <= 1.0 else agentview_img.astype(np.uint8)
+                frames.append(agentview_img)
+
+                action = postprocess(pred_action)
+                obs, reward, done, info = env.step(action)
+                steps += 1
+                print(f"{task_suite_name} Episode {episode + 1} Step {steps} reward: {reward} done: {done} info: {info}")
+
+                if done:
+                    task_successes += 1
+                    break
+            # Logging and saving per-episode result
+            episode_result_dir = os.path.join("tests", "results", "libero", "episodes", f"{task_suite_name}_task_{task_id}")
+            os.makedirs(episode_result_dir, exist_ok=True)
+            episode_result_path = os.path.join(episode_result_dir, f"ep_{episode}_{done}.txt")
+            with open(episode_result_path, "w", encoding="utf-8") as epf:
+                epf.write(
+                    f"task_suite_name: {task_suite_name}\n"
+                    f"task_id: {task_id}\n"
+                    f"episode: {episode}\n"
+                    f"success: {done}\n"
+                    f"steps: {steps}\n"
+                    f"info: {info}\n"
+                )
+            gif_dir = os.path.join("tests", "results", "libero", "videos")
+            os.makedirs(gif_dir, exist_ok=True)
+            gif_path = os.path.join(gif_dir, f"{task_suite_name}_task_{task_id}_ep_{episode}_{done}.gif")
+            frames_processed = process_frames(frames, lang)
+            imageio.mimsave(gif_path, frames_processed, fps=10)
+            print(f"[LOG] Saved agentview GIF: {gif_path}")
+
+        success_rate = task_successes / max_episodes
+        task_success_rates.append(success_rate)
+        print(f"[LOG] {task_suite_name} task_id={task_id} success rate: {success_rate:.2%} ({task_successes}/{max_episodes})")
+
+    avg_success_rate = sum(task_success_rates) / len(task_success_rates)
+    result_dir = os.path.join("tests", "results", "libero")
+    os.makedirs(result_dir, exist_ok=True)
+    result_path = os.path.join(result_dir, f"smolvla_{task_suite_name.replace('/', '_')}_results.txt")
+    with open(result_path, "w", encoding="utf-8") as f:
+        f.write(f"task_suite_name: {task_suite_name}\n")
+        f.write(f"episodes_per_task_id: {max_episodes}\n")
+        for task_id, rate in enumerate(task_success_rates):
+            f.write(f"task_id {task_id}: {rate:.6f}\n")
+        f.write(f"average_success_rate: {avg_success_rate:.6f}\n")
+
+    print(f"[LOG] Saved results: {result_path}")
+    env.close()
+    return task_success_rates
+
+
+def test_result_type():
+    device = torch.device("mps")
+    MODEL_ID = "HuggingFaceVLA/smolvla_libero"
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    patch_draccus_non_callable_types()
+
+    policy = SmolVLAPolicy.from_pretrained(MODEL_ID).to(device).eval()
+    preprocess, postprocess = make_pre_post_processors(
+        policy.config,
+        MODEL_ID,
+        preprocessor_overrides={"device_processor": {"device": str(device)}},
+    )
+
+    benchmark_start_time = time.perf_counter()
+    all_task_success_rates = []
+
+    for task_suite_name in TASK_SUITES:
+        task_success_rates = run_task_suite(policy, preprocess, postprocess, device, task_suite_name)
+        all_task_success_rates.extend(task_success_rates)
+
+    elapsed = time.perf_counter() - benchmark_start_time
+    overall_success_rate = sum(all_task_success_rates) / len(all_task_success_rates)
+    print(f"elapsed: {elapsed:.3f}s, success rate: {overall_success_rate:.2%}")
+
+    assert 1 == True
