@@ -5,6 +5,12 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit, SplitResult
 
 from tt.base.error.error import TektonianBaseError
+from tt.sdk.environment_service.common.model.entity import (
+    EnvironmentCameraEntity,
+    EnvironmentLightEntity,
+    EnvironmentMachineEntity,
+    EnvironmentObjectEntity,
+)
 
 if TYPE_CHECKING:
     from tt.sdk.environment_service.common.model.entity import (
@@ -28,25 +34,13 @@ class IEnvironment(ABC):
 
     benchmark_specific_args: dict[str, Any]
 
-    objects: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = field(
-        default_factory=list
-    )
-    cameras: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = field(
-        default_factory=list
-    )
-    lights: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = field(
-        default_factory=list
-    )
-    machines: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = field(
-        default_factory=list
-    )
+    objects: list[EnvironmentObjectEntity] = field(default_factory=list)
+    cameras: list[EnvironmentCameraEntity] = field(default_factory=list)
+    lights: list[EnvironmentLightEntity] = field(default_factory=list)
+    machines: list[EnvironmentMachineEntity] = field(default_factory=list)
     # region TODO: implment later
-    particles: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = field(
-        default_factory=list
-    )
-    soft_bodies: list[EnvironmentMJCFObjectEntity | EnvironmentURDFObjectEntity] = (
-        field(default_factory=list)
-    )
+    particles: list[Any] = field(default_factory=list)
+    soft_bodies: list[Any] = field(default_factory=list)
     randoms: list[dict[str, dict[str, dict[str, str]]]] = field(default_factory=list)
     constraints: list[dict[str, str]] = field(default_factory=list)
 
