@@ -14,11 +14,7 @@ from tt.sdk.environment_service.common.model.component import (
     URDFPhysicsComponent,
     USDPhysicsComponent,
 )
-from tt.sdk.environment_service.common.model.entity import (
-    EnvironmentMJCFObjectEntity,
-    EnvironmentURDFObjectEntity,
-)
-from tt.sdk.environment_service.common.utils.mjcf_parser import parse_mjcf_path
+
 from tt.sdk.log_service.common.log_service import ILogService
 from tt.sdk.world_service.common.world_service import IWorldManagementService
 

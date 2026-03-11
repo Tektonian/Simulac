@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from copy import deepcopy
 from typing import TYPE_CHECKING, List, MutableMapping, Tuple, TypeVar, Union
 from urllib.parse import SplitResult
 
@@ -95,7 +96,7 @@ class IEnvironmentBuildService(ServiceIdentifier["IEnvironmentBuildService"]):
 
 class EnvironmentBuildService(IEnvironmentBuildService):
 
-    __ID_PREFIX = "ent_"
+    __ID_PREFIX = "thg_"
 
     def __init__(
         self,
@@ -126,9 +127,20 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         3. need mjcf, urdf, usd file parser
         4. compatibility check
         """
-        new_entity_id = f"{self.__ID_PREFIX}{len(self.entities_map)}"
-
         env = self.__get_env(env_id)
+        new_entity_id = (
+            f"{self.__ID_PREFIX}{len(self.env_entities_map.get(env.id, []))}"
+        )
+
+        # region TODO: Remove entity copy code here
+        entity = deepcopy(entity)
+        entity.uuid = new_entity_id
+
+        print(entity, entity.uuid)
+        # end-region
+
+        if env.id not in self.env_entities_map.keys():
+            self.env_entities_map[env.id] = []
 
         if isinstance(entity, EnvironmentObjectEntity):
             env.objects.append(entity)
@@ -160,7 +172,7 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         if entity is None:
             raise TektonianBaseError(f"No entity id {entity_id}")
 
-        entity.pos = pos
+        entity.quat = quat
 
     def __get_env(self, env_id: str) -> IEnvironment:
         env_ret = self.EnvironmentManagementService.get_environment(env_id)
