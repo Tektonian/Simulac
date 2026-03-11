@@ -6,7 +6,7 @@ from tt.sdk.environment_service.common.model.entity import EnvironmentObjectEnti
 
 
 class Stuff:
-    def __init__(self, obj_uri_or_prebuilt_id: str, name: str) -> None:
+    def __init__(self, obj_uri_or_prebuilt_id: str, name: str | None = None) -> None:
         """_summary_
             TODO:
                 1. Handle various name. Expected strings are
