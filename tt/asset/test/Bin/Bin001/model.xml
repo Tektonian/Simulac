@@ -1,0 +1,42 @@
+<mujoco model="bin">
+
+    <worldbody>
+
+        <body name="bin" pos="0 0 0">
+
+            <!-- bottom -->
+            <geom name="bin_bottom"
+                  type="box"
+                  size="0.2 0.2 0.02"
+                  pos="0 0 0"
+                  rgba="0.6 0.6 0.6 1"/>
+
+            <!-- wall +x -->
+            <geom name="wall_x_pos"
+                  type="box"
+                  size="0.02 0.2 0.15"
+                  pos="0.22 0 0.15"/>
+
+            <!-- wall -x -->
+            <geom name="wall_x_neg"
+                  type="box"
+                  size="0.02 0.2 0.15"
+                  pos="-0.22 0 0.15"/>
+
+            <!-- wall +y -->
+            <geom name="wall_y_pos"
+                  type="box"
+                  size="0.2 0.02 0.15"
+                  pos="0 0.22 0.15"/>
+
+            <!-- wall -y -->
+            <geom name="wall_y_neg"
+                  type="box"
+                  size="0.2 0.02 0.15"
+                  pos="0 -0.22 0.15"/>
+
+        </body>
+
+    </worldbody>
+
+</mujoco>
