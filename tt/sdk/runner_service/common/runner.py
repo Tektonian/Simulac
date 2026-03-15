@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Any
 
 
 @dataclass
@@ -39,6 +39,10 @@ class IRunner(ABC):
     @abstractmethod
     def render(self) -> None:
         pass
+
+    @abstractmethod
+    def __debug_render(self) -> Any:
+        """Run adapter specific rendering engine. Should be used for debugging"""
 
 
 class IRunnerFactory(ABC):

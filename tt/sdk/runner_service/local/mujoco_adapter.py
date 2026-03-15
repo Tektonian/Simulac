@@ -100,12 +100,11 @@ class MujocoRunner(IRunner):
 
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
-    def render(self) -> None:
-        with mujoco.viewer.launch_passive(self.mj_model, self._data) as viewer:
-            while viewer.is_running():
-                viewer.sync()
-
+    def render(self) -> None: ...
     def reset(self) -> None: ...
+
+    def __debug_render(self):
+        return mujoco.viewer.launch_passive(self.mj_model, self._data)
 
 
 class MujocoAdapter(IPhysicsEngineAdapter):

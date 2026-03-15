@@ -91,6 +91,9 @@ class Runner:
 
     def get_state(self): ...
 
+    def __debug_render(self):
+        return self._runner.__debug_render()
+
 
 class StuffObject:
     def __init__(

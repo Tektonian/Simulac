@@ -11,3 +11,8 @@ def test_entity_build():
     runner = Runner(env)
 
     runner.step([])
+
+    with runner.render() as viewer:
+        while viewer.is_running():
+            viewer.sync()
+            runner.step([])
