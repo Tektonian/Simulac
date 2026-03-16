@@ -32,12 +32,12 @@ class BenchmarkEnvironment:
         benchmark_id: str,
         remote_env_id: str,
         seed: int,
-        benchmark_specific_kwards: dict[str, Any],
+        benchmark_specific_kwargs: dict[str, Any],
     ):
         self.runner_id = runner_id
         self.benchmark_id = benchmark_id
         self.remote_env_id = remote_env_id
-        self.benchmark_specific_kwards = benchmark_specific_kwards
+        self.benchmark_specific_kwargs = benchmark_specific_kwargs
 
         self._socket: ClientConnection | None = None
 
@@ -50,7 +50,7 @@ class BenchmarkEnvironment:
             f"ws://localhost:3000/api/container/{self.benchmark_id}/{self.remote_env_id}?"
         )
         msg = json.dumps(
-            {"command": "build_env", "args": self.benchmark_specific_kwards}
+            {"command": "build_env", "args": self.benchmark_specific_kwargs}
         )
         self._socket.send(msg)
         recv = json_numpy.loads(self._socket.recv())
