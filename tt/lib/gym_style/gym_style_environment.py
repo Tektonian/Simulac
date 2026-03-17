@@ -73,7 +73,7 @@ class BenchmarkEnvironment:
             self._connect()
 
         self._socket.send(json.dumps({"command": "reset", "args": {}}))
-        recv = self._socket.recv()
+        recv = json_numpy.loads(self._socket.recv())
         return recv
 
     def close(self):
