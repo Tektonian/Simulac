@@ -11,7 +11,7 @@ from .instantiate import IInstantiateService, ServiceIdentifier, IServiceAccesso
 from .service_collection import ServiceCollection
 from .graph import Graph
 
-_ENABLE_TRACING = True
+_ENABLE_TRACING = False
 
 T = TypeVar("T")
 G = Generic[T]
@@ -138,7 +138,9 @@ class InstantiateService(IInstantiateService):
 
         first_service_arg_pos = (
             # Should be service_dependencies[0][1]?
-            service_dependencies[0][1] if len(service_dependencies) > 0 else len(args)
+            service_dependencies[0][1]
+            if len(service_dependencies) > 0
+            else len(args)
         )
 
         if len(args) != first_service_arg_pos:
