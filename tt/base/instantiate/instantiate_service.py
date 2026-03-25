@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from inspect import signature
+import inspect
 import time
 import traceback
 from typing import Generic, Iterable, Optional, Tuple, List, Type, Any, TypeVar, Type
 
 from .descriptor import SyncDescriptor
-from .instantiate import IInstantiateService, ServiceIdentifier, IServiceAccessor
+from .instantiate import IInstantiateService, ServiceIdentifier, IServiceAccessor, _Util
 from .service_collection import ServiceCollection
 from .graph import Graph
 
@@ -57,29 +57,28 @@ class InstantiateService(IInstantiateService):
 
     def _get_service_dependencies[I: object](self, ctor: Type[I]):
 
-        sign = signature(ctor)
-
+        sign = inspect.signature(ctor)
         ret: List[Tuple[Type[ServiceIdentifier[object]], int]] = []
-
         idx = 0
+
         for name, param in sign.parameters.items():
             if name == "self":
                 continue
-            annotation = param.annotation
-            identifier: Type[ServiceIdentifier[object]] | None = next(
-                (
-                    entry
-                    for entry in self._services._entries
-                    if entry.__name__ == annotation
-                ),
-                None,
-            )
+            annotation: str | inspect.Parameter.empty = param.annotation
+            identifier: Type[ServiceIdentifier[Any]] | None = None
+
+            if isinstance(annotation, str):
+                identifier = _Util.service_ids.get(annotation)
+            elif inspect.isclass(annotation) and issubclass(
+                annotation, ServiceIdentifier
+            ):
+                # Won't be reached maybe?
+                identifier = annotation
+
             if identifier is None:
                 raise Exception(f"Unresolved service dependency: {annotation}")
-            # for entry in self._services._entries:
-            #     if entry.__name__ == annotation:
-            #         identifier = entry
-            ret.append((identifier, idx))
+            else:
+                ret.append((identifier, idx))
             idx += 1
 
         return ret

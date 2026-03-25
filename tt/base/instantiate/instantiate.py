@@ -32,18 +32,18 @@ class ServiceIdentifier(Generic[T]):
 
 
 class _Util:
-    service_ids: MutableMapping[str, str] = {}
+    service_ids: dict[str, type[ServiceIdentifier[Any]]] = {}
 
 
 def service_identifier(identifier: str):
 
-    def wrapper[T](cls: Type[T]) -> Type[T]:
+    def wrapper[T](cls: type[ServiceIdentifier[T]]) -> type[ServiceIdentifier[T]]:
         # sign = signature(cls)
 
         key = cls.__name__
         if identifier != key:
             raise BaseException("No maching key")
-        _Util.service_ids[key] = identifier
+        _Util.service_ids[key] = cls
         return cls
 
     return wrapper
