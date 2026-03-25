@@ -14,7 +14,7 @@ I = TypeVar("I")
 
 class IServiceAccessor(ABC):
     @abstractmethod
-    def get(self, identifier: Type[I]) -> I:
+    def get[O: object](self, identifier: type[ServiceIdentifier[O]]) -> O:
         pass
 
 
@@ -32,12 +32,12 @@ class ServiceIdentifier(Generic[T]):
 
 
 class _Util:
-    service_ids: dict[str, type[ServiceIdentifier[Any]]] = {}
+    service_ids: dict[str, Type[ServiceIdentifier[Any]]] = {}
 
 
 def service_identifier(identifier: str):
 
-    def wrapper[T](cls: type[ServiceIdentifier[T]]) -> type[ServiceIdentifier[T]]:
+    def wrapper[T](cls: Type[ServiceIdentifier[T]]) -> Type[ServiceIdentifier[T]]:
         # sign = signature(cls)
 
         key = cls.__name__
@@ -53,7 +53,7 @@ def service_identifier(identifier: str):
 
 
 @service_identifier("IInstantiateService")
-class IInstantiateService(ServiceIdentifier[Any]):
+class IInstantiateService(ServiceIdentifier["IInstantiateService"]):
     @abstractmethod
     def create_instance[I: ServiceIdentifier[Any]](
         self,

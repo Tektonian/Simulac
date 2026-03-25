@@ -4,7 +4,18 @@ from enum import IntEnum
 import inspect
 import time
 import traceback
-from typing import Generic, Iterable, Optional, Tuple, List, Type, Any, TypeVar, Type
+from typing import (
+    Generic,
+    Iterable,
+    Optional,
+    Tuple,
+    List,
+    Type,
+    Any,
+    TypeVar,
+    Type,
+    cast,
+)
 
 from .descriptor import SyncDescriptor
 from .instantiate import IInstantiateService, ServiceIdentifier, IServiceAccessor, _Util
@@ -310,7 +321,7 @@ class InstantiateService(IInstantiateService):
         _done = False
 
         class ServiceAccessor(IServiceAccessor):
-            def get(self, identifier: Type[T]) -> T:
+            def get[O: object](self, identifier: type[ServiceIdentifier[O]]) -> O:
                 nonlocal _done
 
                 __obj = {"name": "service_accessor"}
@@ -329,7 +340,7 @@ class InstantiateService(IInstantiateService):
                     )
 
                 _trace.stop()
-                return ret
+                return cast(T, ret)
 
         accessor = ServiceAccessor()
 

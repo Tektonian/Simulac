@@ -73,7 +73,7 @@ environment_management_service: IEnvironmentManagementService = (
     instantiate_service.service_accessor.get(IEnvironmentManagementService)
 )
 environment_build_service: IEnvironmentBuildService = (
-    instantiate_service.service_accessor.get(identifier=IEnvironmentBuildService)
+    instantiate_service.service_accessor.get(IEnvironmentBuildService)
 )
 
 
