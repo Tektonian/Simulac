@@ -1,16 +1,10 @@
 from __future__ import annotations
-from typing import List, Literal, Tuple
-
-from torch import seed
+from typing import List, Literal, Tuple, overload
 
 from tt.base.error.error import TektonianBaseError
-from tt.lib.world_maker.entity import Robot, Stuff
+from tt.sdk import obtain_runtime
 
-from tt.sdk import (
-    environment_management_service,
-    environment_build_service,
-    runner_management_service,
-)
+from .entity import Robot, Stuff, Camera, Light
 
 
 class Environment:
@@ -23,45 +17,68 @@ class Environment:
         default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
         env_uri_or_prebuilt_id: str | None = None,
     ) -> None:
+        self.world_maker = obtain_runtime().world_maker
 
         self.default_engine = default_engine
-        env_ret = environment_management_service.create_environment(default_engine)
+        self._env = self.world_maker.create_environment(
+            default_engine, env_uri_or_prebuilt_id
+        )
 
-        if env_ret[0] is None:
-            raise env_ret[1]
-
-        self._env = env_ret[0]
-
-    def place_stuff_entity(
+    @overload
+    def place_entity(
         self,
-        stuff: Stuff,
+        entity: Stuff,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-    ) -> StuffObject:
-
-        stuff.entity.pos = pos
-        stuff.entity.quat = quat
-
-        entity_id = environment_build_service.add_entity(self._env.id, stuff.entity)
-
-        stuff_object = StuffObject(entity_id, _prevent_user_direct_call=False)
-
-        return stuff_object
-
-    def place_robot_entity(
+    ) -> StuffObject: ...
+    @overload
+    def place_entity(
         self,
-        robot: Robot,
+        entity: Camera,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-    ) -> RobotObject:
-        robot.entity.pos = pos
-        robot.entity.quat = quat
+    ) -> CameraObject: ...
+    @overload
+    def place_entity(
+        self,
+        entity: Light,
+        pos: Tuple[float, float, float] = (0, 0, 0),
+        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+    ) -> LightObject: ...
+    @overload
+    def place_entity(
+        self,
+        entity: Robot,
+        pos: Tuple[float, float, float] = (0, 0, 0),
+        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+    ) -> RobotObject: ...
+    def place_entity(
+        self,
+        entity: Stuff | Robot | Camera | Light,
+        pos: Tuple[float, float, float] = (0, 0, 0),
+        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+    ) -> StuffObject | RobotObject | CameraObject | LightObject:
 
-        entity_id = environment_build_service.add_entity(self._env.id, robot.entity)
+        if isinstance(entity, Stuff):
+            # change entity pos and quat
+            # should call 'self.world_maker.change_eneity_pos' ?
+            entity._entity.pos = pos
+            entity._entity.quat = quat
+            entity_id = self.world_maker.add_entity(
+                self._env.id, entity._entity, pos=pos, quat=quat
+            )
+            return StuffObject(entity_id, _prevent_user_direct_call=True)
+        elif isinstance(entity, Robot):
+            # change entity pos and quat
+            # should call 'self.world_maker.change_eneity_pos' ?
+            entity._entity.pos = pos
+            entity._entity.quat = quat
 
-        robot_object = RobotObject(entity_id, _prevent_user_direct_call=False)
+            entity_id = self.world_maker.add_entity(self._env.id, entity._entity)
 
-        return robot_object
+            return RobotObject(entity_id, _prevent_user_direct_call=True)
+        else:
+            raise NotImplementedError("Camera and light are not implemented")
 
 
 class Runner:
@@ -77,12 +94,9 @@ class Runner:
         self.seed = seed
         self.tick_time = tick
 
-        runner_ret = runner_management_service.create_runner(env._env.id)
+        self._world_maker = obtain_runtime().world_maker
 
-        if runner_ret[0] is None:
-            raise runner_ret[1]
-
-        self._runner = runner_ret[0]
+        self._runner = self._world_maker.create_runner(env._env.id)
 
     def step(self, action: List[float]):
         self._runner.step(action)
@@ -121,6 +135,16 @@ class RobotObject:
         self.entity_id = entity_id
 
     def set_posture(self, pos: List[float]) -> None: ...
+
+
+class CameraObject:
+    def __init__(self):
+        """not implemented yet"""
+
+
+class LightObject:
+    def __init__(self):
+        """not implemented yet"""
 
 
 # region Will be implemented
