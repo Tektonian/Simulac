@@ -1,7 +1,7 @@
-from enum import Enum
-from typing import List, Tuple, TypeVar, Type, Generic, MutableMapping, Any
 from abc import ABC, abstractmethod
+from enum import Enum
 from inspect import isclass, signature
+from typing import Any, Generic, List, MutableMapping, Tuple, Type, TypeVar
 
 from .descriptor import SyncDescriptor
 from .instantiate import ServiceIdentifier

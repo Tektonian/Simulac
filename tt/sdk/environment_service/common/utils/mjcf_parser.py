@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import List, MutableMapping, Tuple
-import xml.etree.ElementTree as ET
 
 import mujoco
 
@@ -154,7 +154,6 @@ def parse_mjcf_path(uri: str):
     render_ret = []
 
     for body_idx in range(num_body):
-
         if body_idx == 0:
             # pass n==0. idx==0 means <worldbody /> tag
             continue

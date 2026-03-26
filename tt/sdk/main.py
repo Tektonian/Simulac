@@ -3,11 +3,11 @@ from typing import Any
 from tt.base.envvar.envvar import IEnvvarService
 from tt.base.envvar.envvar_service import EnvvarService
 from tt.base.instantiate.extensions import (
-    register_singleton,
     get_singleton_service_descriptors,
+    register_singleton,
 )
-from tt.base.instantiate.service_collection import ServiceCollection
 from tt.base.instantiate.instantiate_service import InstantiateService
+from tt.base.instantiate.service_collection import ServiceCollection
 from tt.sdk.environment_service.common.environment_build_service import (
     EnvironmentBuildService,
     IEnvironmentBuildService,

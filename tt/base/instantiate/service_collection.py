@@ -1,8 +1,7 @@
-from typing import Any, List, Tuple, MutableMapping, Type, TypeVar
+from typing import Any, List, MutableMapping, Tuple, Type, TypeVar
 
 from .descriptor import SyncDescriptor
 from .instantiate import ServiceIdentifier
-
 
 T = TypeVar("T")
 

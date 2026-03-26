@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from abc import ABCMeta
 from typing import TYPE_CHECKING, Callable, MutableMapping
 
@@ -6,23 +7,22 @@ import mujoco
 import mujoco.viewer
 
 from tt.base.error.error import TektonianBaseError
-from tt.sdk.runner_service.common.runner import IRunner, IRunnerFactory
-from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
-
 from tt.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
 )
+from tt.sdk.runner_service.common.runner import IRunner, IRunnerFactory
+from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
 
 if TYPE_CHECKING:
+    from tt.sdk.environment_service.common.environment import IEnvironment
+    from tt.sdk.environment_service.common.environment_service import (
+        IEnvironmentManagementService,
+    )
     from tt.sdk.environment_service.common.model.entity import (
         EnvironmentMJCFObjectEntity,
     )
     from tt.sdk.log_service.common.log_service import ILogService
-    from tt.sdk.environment_service.common.environment_service import (
-        IEnvironmentManagementService,
-    )
-    from tt.sdk.environment_service.common.environment import IEnvironment
 
 
 MUJOCO_SCENE = """

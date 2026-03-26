@@ -95,7 +95,6 @@ class IEnvironmentBuildService(ServiceIdentifier["IEnvironmentBuildService"]):
 
 
 class EnvironmentBuildService(IEnvironmentBuildService):
-
     __ID_PREFIX = "thg_"
 
     def __init__(

@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from enum import IntEnum
 import inspect
 import time
 import traceback
+from enum import IntEnum
 from typing import (
+    Any,
     Generic,
     Iterable,
+    List,
     Optional,
     Tuple,
-    List,
     Type,
-    Any,
     TypeVar,
-    Type,
     cast,
 )
 
 from .descriptor import SyncDescriptor
-from .instantiate import IInstantiateService, ServiceIdentifier, IServiceAccessor, _Util
-from .service_collection import ServiceCollection
 from .graph import Graph
+from .instantiate import IInstantiateService, IServiceAccessor, ServiceIdentifier, _Util
+from .service_collection import ServiceCollection
 
 _ENABLE_TRACING = False
 
@@ -148,9 +147,7 @@ class InstantiateService(IInstantiateService):
 
         first_service_arg_pos = (
             # Should be service_dependencies[0][1]?
-            service_dependencies[0][1]
-            if len(service_dependencies) > 0
-            else len(args)
+            service_dependencies[0][1] if len(service_dependencies) > 0 else len(args)
         )
 
         if len(args) != first_service_arg_pos:

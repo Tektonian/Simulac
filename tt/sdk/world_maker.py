@@ -11,17 +11,16 @@ from tt.sdk.environment_service.common.model.component import (
     URDFPhysicsComponent,
     USDPhysicsComponent,
 )
-from tt.sdk.log_service.common.log_service import ILogService
-from tt.sdk.runner_service.common.runner_service import RunnerManagementService
 from tt.sdk.environment_service.common.model.entity import (
     EnvironmentCameraEntity,
     EnvironmentLightEntity,
     EnvironmentMachineEntity,
     EnvironmentObjectEntity,
 )
+from tt.sdk.log_service.common.log_service import ILogService
+from tt.sdk.runner_service.common.runner_service import RunnerManagementService
 
 if TYPE_CHECKING:
-
     from tt.sdk.environment_service.common.environment import IEnvironment
     from tt.sdk.runner_service.common.runner import IRunner
 
@@ -39,7 +38,6 @@ if TYPE_CHECKING:
 
 
 class WorldMakerFacade:
-
     def __init__(
         self,
         LogService: ILogService,

@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed, Future
+
 import json
 import urllib
 import urllib.parse
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
-from websockets.sync.client import connect, ClientConnection
 import json_numpy
+from websockets.sync.client import ClientConnection, connect
 
 from tt.sdk import obtain_runtime
 
@@ -117,7 +118,10 @@ class BenchmarkVecEnvironment:
                 f.result()
 
             # Phase 2: recv in parallel, maintain order
-            index_map = {ex.submit(lambda rr=r: rr._socket.recv()): i for i, r in enumerate(self.benchmark_envs)}  # type: ignore[union-attr]
+            index_map = {
+                ex.submit(lambda rr=r: rr._socket.recv()): i
+                for i, r in enumerate(self.benchmark_envs)
+            }  # type: ignore[union-attr]
             results: list[Any] = [None] * len(self.benchmark_envs)
             for f in as_completed(index_map):
                 idx = index_map[f]

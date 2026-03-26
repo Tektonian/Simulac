@@ -1,17 +1,18 @@
 from __future__ import annotations
+
 import json
-from typing import TYPE_CHECKING, Any, Callable, MutableMapping
 import urllib.parse
+from typing import TYPE_CHECKING, Any, Callable, MutableMapping
 
 from websockets import connect
 
 from tt.base.error.error import TektonianBaseError
-from tt.sdk.runner_service.common.runner import IRunner
-from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
 from tt.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
 )
+from tt.sdk.runner_service.common.runner import IRunner
+from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
 
 if TYPE_CHECKING:
     from tt.sdk.environment_service.common.environment_service import (

@@ -1,9 +1,17 @@
 from __future__ import annotations
-from inspect import signature
-from typing import TYPE_CHECKING, cast
 
 from abc import ABC, abstractmethod
-from typing import TypeVar, Any, Type, Iterable, MutableMapping, Generic
+from inspect import signature
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Iterable,
+    MutableMapping,
+    Type,
+    TypeVar,
+    cast,
+)
 
 if TYPE_CHECKING:
     from tt.base.instantiate.descriptor import SyncDescriptor

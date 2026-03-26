@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Any, Optional, overload
 
 from .gym_style_environment import BenchmarkEnvironment, BenchmarkVecEnvironment

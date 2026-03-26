@@ -1,4 +1,5 @@
-from typing import Generic, Type, List, Any, TypeVar
+from typing import Any, Generic, List, Type, TypeVar
+
 from .instantiate import ServiceIdentifier
 
 T = TypeVar("T", bound=ServiceIdentifier[object])

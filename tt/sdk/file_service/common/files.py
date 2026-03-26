@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from tt.base.error.error import TektonianBaseError

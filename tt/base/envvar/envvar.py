@@ -6,7 +6,6 @@ from tt.base.instantiate.instantiate import ServiceIdentifier, service_identifie
 
 @service_identifier("IEnvvarService")
 class IEnvvarService(ServiceIdentifier["IEnvvarService"]):
-
     # logging
     @property
     @abstractmethod

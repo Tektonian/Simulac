@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, MutableMapping
+
 from tt.sdk.runner_service.common.runner import IRunnerFactory
 
 if TYPE_CHECKING:
@@ -26,6 +27,5 @@ class IPhysicsEngineAdapterState:
 
 
 class IPhysicsEngineAdapter(IRunnerFactory, ABC):
-
     @abstractmethod
     def get_state(self) -> IPhysicsEngineAdapterState: ...

@@ -28,7 +28,6 @@ class ITelemetryService(ServiceIdentifier["ITelemetryService"]):
 
 
 class TelemetryService(ITelemetryService):
-
     BUFFER_FLUSH_TIMEOUT = 10  # 10s
     BUFFER_SIZE_LIMIT = 1000  # max queued event count
     REQUEST_TIMEOUT = 3

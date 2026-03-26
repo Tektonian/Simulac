@@ -11,12 +11,10 @@ from tt.sdk.log_service.common.log_service import ILogService
 from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
 
 from .main import instantiate_service
-
 from .world_maker import WorldMakerFacade
 
 
 class SimulacRuntime:
-
     def __init__(self):
         old_exception_hook = sys.excepthook
         old_display_hook = sys.displayhook

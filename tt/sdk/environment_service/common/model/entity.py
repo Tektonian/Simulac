@@ -1,15 +1,15 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from uuid import uuid4
-from typing import TYPE_CHECKING, Optional, Tuple
 
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, Tuple
+from uuid import uuid4
 
 if TYPE_CHECKING:
     from tt.sdk.environment_service.common.model.component import (
         MJCFPhysicsComponent,
+        RenderingComponent,
         URDFPhysicsComponent,
         USDPhysicsComponent,
-        RenderingComponent,
     )
 
 

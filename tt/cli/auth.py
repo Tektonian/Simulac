@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
 from tt.base.envvar.envvar_service import EnvvarService
-from importlib.metadata import PackageNotFoundError, version as pkg_version
-
 
 app = typer.Typer(help="Tektonian CLI — interact with Tektonian services")
 
@@ -34,7 +34,7 @@ def login(
         prompt=True,
         hide_input=True,
         help="Your Tektonian API key (will be saved locally)",
-    )
+    ),
 ) -> None:
     env = EnvvarService()
 

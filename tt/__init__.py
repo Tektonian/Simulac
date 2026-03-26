@@ -1,12 +1,11 @@
 from .lib import gym_style
-
-from .lib.world_maker.entity import Robot, Stuff, Camera, Light
+from .lib.world_maker.entity import Camera, Light, Robot, Stuff
 from .lib.world_maker.object import (
+    CameraObject,
     Environment,
+    LightObject,
     RobotObject,
     StuffObject,
-    CameraObject,
-    LightObject,
 )
 
 __all__ = [

@@ -1,5 +1,5 @@
-from .entity import Robot, Stuff, Camera, Light
-from .object import Environment, RobotObject, StuffObject, CameraObject, LightObject
+from .entity import Camera, Light, Robot, Stuff
+from .object import CameraObject, Environment, LightObject, RobotObject, StuffObject
 
 __all__ = [
     "Robot",

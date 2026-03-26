@@ -1,26 +1,27 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Callable, MutableMapping
 
 # Lazy imports for solve dependency issue and heavy package import issue
 # Will be solved? https://peps.python.org/pep-0810/
 # import warp as wp
 # import newton
-
 from tt.base.error.error import TektonianBaseError
-from tt.sdk.runner_service.common.runner import IRunner
 from tt.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
 )
+from tt.sdk.runner_service.common.runner import IRunner
 
 if TYPE_CHECKING:
-    from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
+    import newton
+    import warp as wp
+
     from tt.sdk.environment_service.common.environment_service import (
         IEnvironmentManagementService,
     )
     from tt.sdk.log_service.common.log_service import ILogService
-    import newton
-    import warp as wp
+    from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
 
 
 class NewtonRunner(IRunner):

@@ -1,9 +1,8 @@
 from __future__ import annotations  # 3.7+ 에서 필요
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Tuple, Type
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import TYPE_CHECKING, Any, List, Mapping, MutableMapping, Tuple, Type
 from urllib.parse import urlsplit
 
 from tt.base.error.error import TektonianBaseError
@@ -19,11 +18,12 @@ from tt.sdk.runner_service.common.physics_engine_adapter import (
 from tt.sdk.runner_service.remote.runner import RemoteRunner
 
 if TYPE_CHECKING:
-    from .runner import IRunner
+    from tt.sdk.log_service.common.log_service import ILogService
     from tt.sdk.runner_service.common.physics_engine_adapter import (
         IPhysicsEngineAdapter,
     )
-    from tt.sdk.log_service.common.log_service import ILogService
+
+    from .runner import IRunner
 
 
 @service_identifier("IRunnerManagementService")
@@ -67,9 +67,9 @@ class RunnerManagementService(IRunnerManagementService):
         self.EnvironmentManagementService = EnvironmentManagementService
         self.LogService = LogService
         self.runners: List[IRunner] = []
-        self.physics_adapter: MutableMapping[str, IPhysicsEngineAdapter] = (
-            {}
-        )  # env_id: adapter
+        self.physics_adapter: MutableMapping[
+            str, IPhysicsEngineAdapter
+        ] = {}  # env_id: adapter
         self.physics_adapter_factory: MutableMapping[  # engine: adapter_factory // e.g., {"mujoco": MujocoAdapter}
             str, Type[IPhysicsEngineAdapterFactory]
         ] = {}

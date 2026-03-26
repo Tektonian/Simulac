@@ -1,9 +1,11 @@
-from typing import Union
 import typing
-import duckdb.sqltypes as sqltypes 
+from typing import Union
+
+import cv2.typing
 import duckdb
-import cv2.typing 
+import duckdb.sqltypes as sqltypes
 import numpy
+
 
 class Range1D:
     """A simple 1D range type.
@@ -26,17 +28,17 @@ class Range1D:
     @classmethod
     def __sql_name__(self):
         return "RANGE1D"
-    
+
     @classmethod
     def __sql_type__(self) -> sqltypes.DuckDBPyType:
         return duckdb.array_type(sqltypes.DOUBLE, 2)
 
     @classmethod
     def __create_type__(self) -> str:
-        return 'CREATE TYPE RANGE1D AS DOUBLE[2];'
-    
-class Range2D:
+        return "CREATE TYPE RANGE1D AS DOUBLE[2];"
 
+
+class Range2D:
     def __init__(self, x_range: Range1D, y_range: Range1D):
         self.x_range = x_range
         self.y_range = y_range
@@ -50,12 +52,13 @@ class Range2D:
     @classmethod
     def __sql_name__(self):
         return "RANGE2D"
-    
+
     @classmethod
     def __sql_type__(self) -> sqltypes.DuckDBPyType:
-        return duckdb.struct_type({"x_range": Range1D.__sql_type__(), "y_range": Range1D.__sql_type__()})
+        return duckdb.struct_type(
+            {"x_range": Range1D.__sql_type__(), "y_range": Range1D.__sql_type__()}
+        )
 
     @classmethod
     def __create_type__(self) -> str:
         return f"CREATE TYPE RANGE2D AS STRUCT(x_range {Range1D.__sql_type__()}, y_range {Range1D.__sql_type__()});"
-    

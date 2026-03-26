@@ -1,9 +1,9 @@
+import json
 from dataclasses import dataclass
 from typing import Any, Dict
-import json
 from urllib.parse import urlencode
 
-from websockets.sync.client import connect, ClientConnection
+from websockets.sync.client import ClientConnection, connect
 
 from tt.sdk.runner_service.common.runner import IRunner
 
