@@ -1,5 +1,6 @@
 import sys
 
+from tt.base.envvar.envvar import IEnvvarService
 from tt.sdk.environment_service.common.environment_build_service import (
     IEnvironmentBuildService,
 )
@@ -40,6 +41,9 @@ class SimulacRuntime:
         )
         self.environment_build_service: IEnvironmentBuildService = (
             instantiate_service.service_accessor.get(IEnvironmentBuildService)
+        )
+        self.envvar_service: IEnvvarService = instantiate_service.service_accessor.get(
+            IEnvvarService
         )
 
         self._world_maker: WorldMakerFacade = instantiate_service.create_instance(

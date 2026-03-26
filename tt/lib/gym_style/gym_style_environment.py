@@ -2,19 +2,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 import json
+import urllib
+import urllib.parse
 
 from websockets.sync.client import connect, ClientConnection
 import json_numpy
 
-from tt.base.error.error import TektonianBaseError
-from tt.sdk.environment_service.common.environment_service import (
-    IEnvironmentManagementService,
-)
-from tt.sdk.runner_service.common.runner import IRunner
-from tt.sdk.runner_service.common.runner_service import IRunnerManagementService
-
-if TYPE_CHECKING:
-    from tt.base.instantiate.instantiate import IInstantiateService
+from tt.sdk import obtain_runtime
 
 type GymEnvStepReturnType = Tuple[
     dict[str, Any],  # obs
@@ -34,6 +28,9 @@ class BenchmarkEnvironment:
         seed: int,
         benchmark_specific_kwargs: dict[str, Any],
     ):
+
+        self.runtime = obtain_runtime()
+
         self.runner_id = runner_id
         self.benchmark_id = benchmark_id
         self.remote_env_id = remote_env_id
@@ -46,9 +43,11 @@ class BenchmarkEnvironment:
         if self._socket:
             return
 
-        self._socket = connect(
-            f"ws://localhost:3000/api/container/{self.benchmark_id}/{self.remote_env_id}?"
+        base_url = self.runtime.envvar_service.base_url
+        url = urllib.parse.urljoin(
+            base_url, f"container/{self.benchmark_id}/{self.remote_env_id}"
         )
+        self._socket = connect(url)
         msg = json.dumps(
             {"command": "build_env", "args": self.benchmark_specific_kwargs}
         )
