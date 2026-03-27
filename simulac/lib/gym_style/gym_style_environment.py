@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib
 import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -44,10 +45,13 @@ class BenchmarkEnvironment:
         if self._socket:
             return
 
-        base_url = self.runtime.envvar_service.base_url
-        url = urllib.parse.urljoin(
-            base_url, f"container/{self.benchmark_id}/{self.remote_env_id}"
+        base_url = urllib.parse.urlparse(self.runtime.envvar_service.base_url)
+        base_url._replace(
+            path=os.path.join(
+                base_url.path, f"container/{self.benchmark_id}/{self.remote_env_id}"
+            )
         )
+        url = base_url.geturl()
         self._socket = connect(url)
         msg = json.dumps(
             {"command": "build_env", "args": self.benchmark_specific_kwargs}
