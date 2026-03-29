@@ -36,7 +36,7 @@ class IEnvvarService(ServiceIdentifier["IEnvvarService"]):
 
     @property
     @abstractmethod
-    def cache_dir(self) -> Path: ...
+    def simulac_cache_dir(self) -> Path: ...
 
     @property
     @abstractmethod

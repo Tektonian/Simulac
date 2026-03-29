@@ -66,16 +66,16 @@ class EnvvarService(IEnvvarService):
         return Path(self._tmp_dir)
 
     @property
-    def cache_dir(self) -> Path:
-        return Path(os.path.join(self.user_home, ".cache"))
+    def simulac_cache_dir(self) -> Path:
+        return Path(os.path.join(self.user_home, ".cache", "simulac"))
 
     @property
     def asset_dir(self) -> Path:
-        return Path(os.path.join(self.cache_dir, "asset"))
+        return Path(os.path.join(self.simulac_cache_dir, "asset"))
 
     @property
     def token_path(self) -> Path:
-        return Path(os.path.join(self.cache_dir, "token"))
+        return Path(os.path.join(self.simulac_cache_dir, "token"))
 
     @property
     def token(self) -> str | None:
