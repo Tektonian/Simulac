@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from simulac.sdk.environment_service.common.environment_service import (
-    EnvironmentManagementService,
+    IEnvironmentManagementService,
 )
 from simulac.sdk.environment_service.common.model.component import (
     MJCFPhysicsComponent,
@@ -18,7 +18,9 @@ from simulac.sdk.environment_service.common.model.entity import (
     EnvironmentObjectEntity,
 )
 from simulac.sdk.log_service.common.log_service import ILogService
-from simulac.sdk.runner_service.common.runner_service import RunnerManagementService
+from simulac.sdk.runner_service.common.runner_service import (
+    IRunnerManagementService,
+)
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -41,8 +43,8 @@ class WorldMakerFacade:
     def __init__(
         self,
         LogService: ILogService,
-        RunnerManagementService: RunnerManagementService,
-        EnvironmentManagementService: EnvironmentManagementService,
+        RunnerManagementService: IRunnerManagementService,
+        EnvironmentManagementService: IEnvironmentManagementService,
     ):
         self.LogService = LogService
         self.RunnerManagementService = RunnerManagementService
