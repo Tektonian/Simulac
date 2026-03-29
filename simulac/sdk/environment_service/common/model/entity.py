@@ -90,7 +90,7 @@ class EnvironmentStuffEntity:
         size: Tuple[float, float, float] = (1, 1, 1),
         fixed: bool = True,
     ) -> None:
-        self.uuid = str(uuid4())
+        self.id = f"env_stu_{uuid4().hex}"
         self.name = name
         self.physics = physics
         self.rendering = rendering
@@ -102,7 +102,7 @@ class EnvironmentStuffEntity:
 
     def to_dict(self):
         return dict(
-            uuid=self.uuid,
+            id=self.id,
             mjcf_uri=self.physics.mjcf_uri,
             pos=self.pos,
             quat=self.quat,

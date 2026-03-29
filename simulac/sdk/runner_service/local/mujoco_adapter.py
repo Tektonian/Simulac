@@ -158,7 +158,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
                     body.pos = list(obj.pos)
                     body.quat = list(obj.quat)
 
-            self.root_spec.attach(child, frame=self.root_frame, prefix=obj.uuid)
+            self.root_spec.attach(child, frame=self.root_frame, prefix=obj.id)
         """
         TODO: 
             1. implement mujoco parallel
