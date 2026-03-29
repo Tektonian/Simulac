@@ -103,7 +103,7 @@ class MujocoRunner(IRunner):
     def render(self) -> None: ...
     def reset(self) -> None: ...
 
-    def __debug_render(self):
+    def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)
 
 

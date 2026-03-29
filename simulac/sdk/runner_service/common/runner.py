@@ -41,7 +41,7 @@ class IRunner(ABC):
         pass
 
     @abstractmethod
-    def __debug_render(self) -> Any:
+    def _debug_render(self) -> Any:
         """Run adapter specific rendering engine. Should be used for debugging"""
 
 

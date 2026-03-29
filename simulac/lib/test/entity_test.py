@@ -12,7 +12,7 @@ def test_entity_build():
 
     runner.step([])
 
-    with runner.render() as viewer:
+    with runner._debug_render() as viewer:
         while viewer.is_running():
             viewer.sync()
             runner.step([])
