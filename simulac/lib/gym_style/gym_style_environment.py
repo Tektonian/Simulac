@@ -191,42 +191,53 @@ class BenchmarkEnvironment:
 
 class BenchmarkVecEnvironment:
     def __init__(self, benchmark_envs: list[BenchmarkEnvironment]) -> None:
-        self.benchmark_envs = benchmark_envs
+        self._benchmark_envs = benchmark_envs
+        self._runtime = obtain_runtime()
 
     def step(self, actions: list[list[float]]) -> list[GymEnvStepReturnType]:
         """Send step to all envs concurrently and gather responses.
         Results are returned in the same order as the provided `envs` list.
         """
 
-        if not self.benchmark_envs:
-            return []
+        if len(actions) != len(self._benchmark_envs):
+            self._runtime.logger.warn(
+                "\n".join(
+                    [
+                        "Action list length is not same as Environment length.",
+                        f"Action[{len(actions)}] != Environment[{len(self._benchmark_envs)}]",
+                    ]
+                )
+            )
 
-        for env in self.benchmark_envs:
-            if env._socket is None:
-                env._connect()
+        if not self._benchmark_envs:
+            return []
 
         # Phase 1: send in parallel
         def _send_payload(r: BenchmarkEnvironment, action: list[float]) -> None:
-            payload: dict[str, Any] = {"command": "step", "args": {"action": action}}
-            r._socket.send(json.dumps(payload))  # type: ignore[union-attr]
+            socket = r._ensure_connected()
+            r._send_command(socket, "step", action=list(action))
 
-        with ThreadPoolExecutor(max_workers=len(self.benchmark_envs)) as ex:
+        def _recv_payload(r: BenchmarkEnvironment) -> GymEnvStepReturnType:
+            socket = r._ensure_connected()
+            return r._receive_packed_message(socket)
+
+        with ThreadPoolExecutor(max_workers=len(self._benchmark_envs)) as ex:
             send_futs = [
                 ex.submit(_send_payload, r[0], r[1])
-                for r in zip(self.benchmark_envs, actions)
+                for r in zip(self._benchmark_envs, actions)
             ]
             # Ensure all sends complete (propagate any exceptions)
             for f in as_completed(send_futs):
                 f.result()
 
             # Phase 2: recv in parallel, maintain order
-            index_map = {
-                ex.submit(lambda rr=r: rr._socket.recv()): i
-                for i, r in enumerate(self.benchmark_envs)
-            }  # type: ignore[union-attr]
-            results: list[Any] = [None] * len(self.benchmark_envs)
-            for f in as_completed(index_map):
-                idx = index_map[f]
+            recv_futs = {
+                ex.submit(_recv_payload, r): i
+                for i, r in enumerate(self._benchmark_envs)
+            }
+            results: list[Any] = [None] * len(self._benchmark_envs)
+            for f in as_completed(recv_futs):
+                idx = recv_futs[f]
                 results[idx] = f.result()
 
         return results
