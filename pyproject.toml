@@ -41,7 +41,6 @@ dependencies = [
     "pydantic<3",
     "duckdb>=1.4",
     "structlog>=25.5.0",
-    "json-numpy>=2.1.1",
     "mujoco>=3.5.0",
     "websockets>=15.0.1",
     "typer>=0.24.1",
@@ -99,7 +98,7 @@ exclude = ["trash"]
 [tool.pyright]
 stubPath = ".typings"
 
-[lint.isort]
+[tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
 
 # END - linting tool setting
