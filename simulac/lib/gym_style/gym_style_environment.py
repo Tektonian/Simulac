@@ -76,6 +76,16 @@ class BenchmarkEnvironment:
         ).geturl()
 
     def _ensure_connected(self) -> ClientConnection:
+        """Try socket connection and return socket.
+        Once connection made, socket requests to build env with `build_env` command.
+        In most code pattern, this function is used for lazy connection
+
+        Raises:
+            SimulacBaseError: Socket connection failed
+
+        Returns:
+            ClientConnection: client socket
+        """
         # Timeout seconds and retry count are set explicitly
         # Because of cold-start of remote container
         MAX_CONNECT_RETRIES = 3
