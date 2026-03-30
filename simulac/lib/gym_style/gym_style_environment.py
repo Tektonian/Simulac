@@ -5,21 +5,24 @@ import os
 import urllib
 import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import Any, Tuple, Type, TypeAlias
 
 import msgpack
 import zstd
+from websockets import InvalidHandshake
 from websockets.sync.client import ClientConnection, connect
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
 
-type GymEnvStepReturnType = Tuple[
-    dict[str, Any],  # obs
-    dict[str, Any],  # reward
-    bool,  # termination
-    bool,  # truncation
-    dict[str, Any],  # info
+GymEnvStepReturnType: TypeAlias = Type[
+    Tuple[
+        dict[str, Any],  # obs
+        dict[str, Any],  # reward
+        bool,  # termination
+        bool,  # truncation
+        dict[str, Any],  # info
+    ]
 ]
 
 
@@ -43,97 +46,132 @@ class BenchmarkEnvironment:
 
         self._socket: ClientConnection | None = None
 
-    def _connect(self):
-
-        if self._socket:
-            return
-
+    def _get_api_key(self) -> str:
         api_key = self._runtime.environment_variable.token
         if api_key is None:
-            self._runtime.logger.error(
-                "\n".join(
-                    [
-                        "",
-                        "Api key for remote benchmark service not found",
-                        "Please visit https://tektonian.com/settings/token to get service token",
-                        "If you already have one. Enter `simulac login` command in your terminal and enter your api-key",
-                    ]
-                )
+            _API_KEY_ERROR_MESSAGE = "\n".join(
+                [
+                    "API key for the remote benchmark service was not found.",
+                    "Get a token at https://tektonian.com/settings/token.",
+                    "Then run `simulac login` in your terminal and paste the API key.",
+                ]
             )
-            raise SimulacBaseError(
-                "\n".join(
-                    [
-                        "Api key not found",
-                        "Please visit https://tektonian.com/settings/token to get a api-key",
-                        "Or enter your api-key with `simulac login` command",
-                    ]
-                )
-            )
+            self._runtime.logger.error(_API_KEY_ERROR_MESSAGE)
+            raise SimulacBaseError(_API_KEY_ERROR_MESSAGE)
+        return api_key
 
-        query_param = urllib.parse.urlencode({"api_key": ""})
+    def _build_ws_url(self) -> str:
+        query_param = urllib.parse.urlencode(
+            {"api_key": self._get_api_key(), "benchmark_id": self.benchmark_id}
+        )
         base_url = urllib.parse.urlparse(self._runtime.environment_variable.base_url)
-        base_url = base_url._replace(
-            scheme="ws" if base_url.scheme == "http" else "wss",
+        ws_scheme = {"http": "ws", "https": "wss"}.get(base_url.scheme, "wss")
+        return base_url._replace(
+            scheme=ws_scheme,
             path=os.path.join(
                 base_url.path,
                 f"container/{self.benchmark_id}",
             ),
             query=query_param,
+        ).geturl()
+
+    def _ensure_connected(self) -> ClientConnection:
+        # Timeout seconds and retry count are set explicitly
+        # Because of cold-start of remote container
+        MAX_CONNECT_RETRIES = 3
+        OPEN_TIMEOUT = 10
+
+        if self._socket is not None:
+            return self._socket
+
+        url = self._build_ws_url()
+
+        for attempt in range(1, MAX_CONNECT_RETRIES + 1):
+            try:
+                self._socket = connect(
+                    url,
+                    open_timeout=OPEN_TIMEOUT,
+                    ping_interval=5,
+                    ping_timeout=10,
+                )
+                break
+            except (TimeoutError, InvalidHandshake) as err:
+                if attempt == MAX_CONNECT_RETRIES:
+                    self._runtime.telemetry.public_error(
+                        event_name="simulac_connection_failed",
+                        data={
+                            "err": err.args,
+                            "stacktrace": err.__traceback__,
+                        },
+                    )
+                    raise SimulacBaseError(
+                        "Unable to connect to the remote benchmark service. "
+                        f"benchmark_id={self.benchmark_id!r}, attempts={attempt}."
+                    ) from err
+
+                self._runtime.logger.warn(
+                    "Connection to the remote benchmark service failed. "
+                    f"benchmark_id={self.benchmark_id!r}, "
+                    f"attempt={attempt}/{MAX_CONNECT_RETRIES}, "
+                    f"Retrying in {OPEN_TIMEOUT:.1f}s."
+                )
+
+        if self._socket is None:
+            raise SimulacBaseError("Benchmark environment is not connected.")
+
+        socket = self._socket
+
+        self._send_command(
+            socket,
+            "build_env",
+            env_id=self.remote_env_id,
+            seed=self.init_seed,
+            **self.benchmark_specific_kwargs,
         )
-        url = base_url.geturl()
-        self._socket = connect(url)
-        self._runtime.logger.debug(f"socket connected. url: {url}")
-        msg = json.dumps(
-            {
-                "command": "build_env",
-                "args": {
-                    "env_id": self.remote_env_id,
-                    "seed": self.init_seed,
-                    **self.benchmark_specific_kwargs,
-                },
-            }
-        )
-        self._socket.send(msg)
-        recv = self._socket.recv(decode=False)
-        recv = zstd.uncompress(recv)
-        recv = msgpack.unpackb(recv)
+        self._receive_packed_message(socket)
+
         self._runtime.logger.debug(
-            f"benchmark env built. ID: {self.benchmark_id} / ENV: {self.remote_env_id}"
+            "Benchmark environment is ready. "
+            f"benchmark_id={self.benchmark_id!r}, env_id={self.remote_env_id!r}"
         )
+        return socket
+
+    def _send_command(
+        self,
+        socket: ClientConnection,
+        command: str,
+        /,
+        **args: Any,
+    ) -> None:
+        socket.send(json.dumps({"command": command, "args": args}))
+
+    def _receive_packed_message(self, socket: ClientConnection) -> dict:
+        payload = socket.recv(decode=False)
+        return msgpack.unpackb(zstd.decompress(payload))
 
     def step(self, action: list[float]) -> GymEnvStepReturnType:
 
-        if self._socket is None:
-            self._connect()
-
-        self._socket.send(json.dumps({"command": "step", "args": {"action": action}}))
-
+        socket = self._ensure_connected()
+        self._send_command(socket, "step", action=list(action))
         """
-        Transfered data size
+        NOTE: Transfered data size
         On Libero
          - Before packing: ~2MB
          - After packing: 500KB
          - After compression: 200KB
         """
-        recv = self._socket.recv(decode=False)
-        recv = zstd.uncompress(recv)
-        recv: dict = msgpack.unpackb(recv)
-        return recv
+        return self._receive_packed_message(socket)
 
     def reset(self, seed: int = 0):
-
-        if self._socket is None:
-            self._connect()
-
-        self._socket.send(json.dumps({"command": "reset", "args": {"seed": seed}}))
-        recv = self._socket.recv(decode=False)
-        recv = zstd.decompress(recv)
-        recv = msgpack.unpackb(recv)
-        return recv
+        socket = self._ensure_connected()
+        self._send_command(socket, "reset", seed=seed)
+        return self._receive_packed_message(socket)
 
     def close(self):
-        if self._socket:
-            self._socket.close()
+        if self._socket is None:
+            return
+        self._socket.close()
+        self._socket = None
 
     @property
     def action_space(self): ...
