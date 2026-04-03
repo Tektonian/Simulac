@@ -46,6 +46,7 @@ dependencies = [
     "typer>=0.24.1",
     "zstd>=1.5.7.3",
     "msgpack>=1.1.2",
+    "ipdb>=0.13.13",
 ]
 
 [project.scripts]
