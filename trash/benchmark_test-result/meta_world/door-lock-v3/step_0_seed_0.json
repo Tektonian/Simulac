@@ -1,0 +1,63 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_eef_pos": [
+                0.0044831218002558005,
+                0.6007454872354674,
+                0.19475280318856725
+            ],
+            "robot_0_gripper_open": [
+                1.0
+            ],
+            "object_0_pos": [
+                0.006685824314987418,
+                0.6696096234961203,
+                0.22098795762039253
+            ],
+            "object_0_quat": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_quat": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "goal_0_pos": [
+                -0.08331551291159628,
+                0.6696096234961203,
+                0.11099999999999999
+            ]
+        }
+    },
+    "reward": 1.1976893667093589,
+    "done": false,
+    "info": {
+        "success": 0.0,
+        "near_object": 1.0,
+        "grasp_success": 1.0,
+        "grasp_reward": 0.2325518348048355,
+        "in_place_reward": 0.091573212137461,
+        "obj_to_target": 0.10998795762039254,
+        "unscaled_reward": 1.1976893667093589,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "corner3": 0
+            },
+            "object_map": {
+                "object_0": "door",
+                "object_1": "lock"
+            }
+        }
+    }
+}

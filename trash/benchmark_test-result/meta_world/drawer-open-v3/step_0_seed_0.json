@@ -1,0 +1,63 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_eef_pos": [
+                0.004601670199426394,
+                0.6010370132953337,
+                0.19493420788016064
+            ],
+            "robot_0_gripper_open": [
+                1.0
+            ],
+            "object_0_pos": [
+                -0.08331551291159629,
+                0.7299999999999994,
+                0.09000000000000001
+            ],
+            "object_0_quat": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_quat": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "goal_0_pos": [
+                -0.08331551291159629,
+                0.54,
+                0.09
+            ]
+        }
+    },
+    "reward": 1.216026083652153,
+    "done": false,
+    "info": {
+        "success": 0.0,
+        "near_object": 0.0,
+        "grasp_success": 1.0,
+        "grasp_reward": 0.10991631303166273,
+        "in_place_reward": 0.1332889036987679,
+        "obj_to_target": 0.1899999999999994,
+        "unscaled_reward": 1.216026083652153,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "corner3": 0
+            },
+            "object_map": {
+                "object_0": "drawer",
+                "object_1": "handle"
+            }
+        }
+    }
+}

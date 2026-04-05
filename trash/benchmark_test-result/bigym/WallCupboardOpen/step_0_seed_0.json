@@ -1,0 +1,131 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_joint_qpos": [
+                0.0009677727939561009,
+                -9.731265163281932e-05,
+                -0.0001316084963036701,
+                0.0023672785609960556,
+                0.0004811799735762179,
+                0.0013485788367688656,
+                0.0018708904972299933,
+                -0.004177887924015522,
+                0.00048070630873553455,
+                0.0013440240873023868,
+                0.0018624531803652644,
+                -0.004158144351094961,
+                6.635107752117619e-07,
+                0.0009680719813331962,
+                9.745319403009489e-05,
+                0.00013132375897839665,
+                0.0023672126699239016,
+                0.00048070293269120157,
+                0.0013440323527902365,
+                0.0018624773947522044,
+                -0.00415822584182024,
+                0.0004811767430510372,
+                0.00134856509976089,
+                0.0018708850257098675,
+                -0.0041778492741286755,
+                1.5664910790746944e-07,
+                -0.1999574601650238,
+                -1.1577907521598263e-08,
+                5.790032560071268e-07
+            ],
+            "robot_0_joint_qvel": [
+                0.08507071435451508,
+                -0.00789004098623991,
+                -0.010070892050862312,
+                0.18387547135353088,
+                0.0291926097124815,
+                -0.01773335598409176,
+                0.011035212315618992,
+                -0.017439868301153183,
+                0.029172204434871674,
+                -0.017018500715494156,
+                0.011601942591369152,
+                -0.018583565950393677,
+                4.4745680497726426e-05,
+                0.08505722880363464,
+                0.00792018137872219,
+                0.010077404789626598,
+                0.1838873326778412,
+                0.029172558337450027,
+                -0.017020011320710182,
+                0.011602825485169888,
+                -0.018585778772830963,
+                0.029192861169576645,
+                -0.01773045025765896,
+                0.011038288474082947,
+                -0.017451006919145584,
+                1.9131584849674255e-05,
+                0.0033374775666743517,
+                -7.197234026534716e-07,
+                4.7391627049364615e-06
+            ],
+            "robot_0_gripper_qpos": [
+                0.0,
+                0.0
+            ],
+            "robot_0_floating_base_qpos": [
+                -0.1999574601650238,
+                -1.1577907521598263e-08,
+                5.790032560071268e-07
+            ],
+            "robot_0_floating_base_actions": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        }
+    },
+    "reward": 0.0,
+    "done": false,
+    "info": {
+        "task_success": 0.0,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "external": 0,
+                "head": 1,
+                "left_wrist": 2,
+                "right_wrist": 3
+            },
+            "robot_map": {
+                "robot_0_joint_0": "left_shoulder_pitch",
+                "robot_0_joint_1": "left_shoulder_roll",
+                "robot_0_joint_2": "left_shoulder_yaw",
+                "robot_0_joint_3": "left_elbow",
+                "robot_0_joint_4": "right_driver_joint",
+                "robot_0_joint_5": "right_coupler_joint",
+                "robot_0_joint_6": "right_spring_link_joint",
+                "robot_0_joint_7": "right_follower_joint",
+                "robot_0_joint_8": "left_driver_joint",
+                "robot_0_joint_9": "left_coupler_joint",
+                "robot_0_joint_10": "left_spring_link_joint",
+                "robot_0_joint_11": "left_follower_joint",
+                "robot_0_joint_12": "left_wrist",
+                "robot_0_joint_13": "right_shoulder_pitch",
+                "robot_0_joint_14": "right_shoulder_roll",
+                "robot_0_joint_15": "right_shoulder_yaw",
+                "robot_0_joint_16": "right_elbow",
+                "robot_0_joint_17": "right_driver_joint",
+                "robot_0_joint_18": "right_coupler_joint",
+                "robot_0_joint_19": "right_spring_link_joint",
+                "robot_0_joint_20": "right_follower_joint",
+                "robot_0_joint_21": "left_driver_joint",
+                "robot_0_joint_22": "left_coupler_joint",
+                "robot_0_joint_23": "left_spring_link_joint",
+                "robot_0_joint_24": "left_follower_joint",
+                "robot_0_joint_25": "right_wrist",
+                "robot_0_joint_26": "pelvis_x",
+                "robot_0_joint_27": "pelvis_y",
+                "robot_0_joint_28": "pelvis_rz",
+                "robot_0_gripper_0": "left",
+                "robot_0_gripper_1": "right"
+            },
+            "object_map": {}
+        }
+    }
+}

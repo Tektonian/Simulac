@@ -1,0 +1,63 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_eef_pos": [
+                0.004556405540241148,
+                0.40021961469373657,
+                0.1954452194578866
+            ],
+            "robot_0_gripper_open": [
+                1.0
+            ],
+            "object_0_pos": [
+                -0.0683155129115963,
+                0.6526096234961203,
+                0.114
+            ],
+            "object_0_quat": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_quat": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "goal_0_pos": [
+                -0.25831551291159627,
+                0.8276096234961203,
+                0.125
+            ]
+        }
+    },
+    "reward": 2.2872643658142824,
+    "done": false,
+    "info": {
+        "success": 0.0,
+        "near_object": 0.0,
+        "grasp_success": 1.0,
+        "grasp_reward": 0.479253321606503,
+        "in_place_reward": 0.061708513231378374,
+        "obj_to_target": 0.25854593402333753,
+        "unscaled_reward": 2.2872643658142824,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "corner3": 0
+            },
+            "object_map": {
+                "object_0": "faucet",
+                "object_1": "handle"
+            }
+        }
+    }
+}

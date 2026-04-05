@@ -1,0 +1,63 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_eef_pos": [
+                0.004601670256238032,
+                0.6010369892922848,
+                0.19493420486131535
+            ],
+            "robot_0_gripper_open": [
+                1.0
+            ],
+            "object_0_pos": [
+                -0.08210109099342192,
+                0.6405942321968283,
+                0.06997204382424627
+            ],
+            "object_0_quat": [
+                3.5862132175636974e-39,
+                -4.851983118467745e-14,
+                5.767353975229609e-53,
+                1.0
+            ],
+            "object_1_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_quat": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "goal_0_pos": [
+                0.0,
+                0.84,
+                0.02
+            ]
+        }
+    },
+    "reward": 0.18456118884176062,
+    "done": false,
+    "info": {
+        "success": 0.0,
+        "near_object": 0.0,
+        "grasp_reward": 0.025321047189817144,
+        "grasp_success": 0.0,
+        "in_place_reward": 0.15847024459684236,
+        "obj_to_target": 0.21564612070585124,
+        "unscaled_reward": 0.18456118884176062,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "corner3": 0
+            },
+            "object_map": {
+                "object_0": "puck",
+                "object_1": "hole"
+            }
+        }
+    }
+}

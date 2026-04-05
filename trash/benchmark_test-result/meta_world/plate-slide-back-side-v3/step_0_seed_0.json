@@ -1,0 +1,63 @@
+{
+    "obs": {
+        "states": {
+            "robot_0_eef_pos": [
+                0.004601670199426394,
+                0.6010370132953337,
+                0.19493420788016064
+            ],
+            "robot_0_gripper_open": [
+                1.0
+            ],
+            "object_0_pos": [
+                -0.15,
+                0.6,
+                0.015
+            ],
+            "object_0_quat": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "object_1_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "object_1_quat": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "goal_0_pos": [
+                0.08610289622856517,
+                0.6,
+                0.015
+            ]
+        }
+    },
+    "reward": 0.32665118912643476,
+    "done": false,
+    "info": {
+        "success": 0.0,
+        "near_object": 0.0,
+        "grasp_success": 0.0,
+        "grasp_reward": 0.21776745941762315,
+        "in_place_reward": 0.20836919197490222,
+        "obj_to_target": 0.23610289622856517,
+        "unscaled_reward": 0.32665118912643476,
+        "terminated": false,
+        "truncated": false,
+        "obs_meta": {
+            "cam_map": {
+                "corner3": 0
+            },
+            "object_map": {
+                "object_0": "puck",
+                "object_1": "plate"
+            }
+        }
+    }
+}

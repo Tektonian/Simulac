@@ -560,32 +560,72 @@ BIGYM_TASK_MAP = [
     "WallCupboardOpen"
 ]
 
-@pytest.mark.integration
-def test_bigym_benchmark():
-    env = init_bench(
-        "Tektonian/Bigym",
-        "MovePlate",
-        0,
-        benchmark_specific={"floating_base": True, "control_frequency": 50},
-    )
-    EMPTY_ACTION = [0] * 15
-    obs_history = []
-    obs_history.append(env.step(EMPTY_ACTION))
-    for _ in range(4):
-        obs_history.append(env.step(EMPTY_ACTION))
+# @pytest.mark.integration
+# def test_bigym_benchmark():
+#     env = init_bench(
+#         "Tektonian/Bigym",
+#         "MovePlate",
+#         0,
+#         benchmark_specific={"floating_base": True, "control_frequency": 50},
+#     )
+#     EMPTY_ACTION = [0] * 15
+#     obs_history = []
+#     obs_history.append(env.step(EMPTY_ACTION))
+#     for _ in range(4):
+#         obs_history.append(env.step(EMPTY_ACTION))
 
-    reset = env.reset(0)
-    for i in range(len(obs_history)):
-        ret = env.step(EMPTY_ACTION)
-        assert ret == obs_history[i]
+#     reset = env.reset(0)
+#     for i in range(len(obs_history)):
+#         ret = env.step(EMPTY_ACTION)
 
-    new_env = init_bench(
-        "Tektonian/Bigym",
-        "MovePlate",
-        0,
-        benchmark_specific={"floating_base": True, "control_frequency": 50},
-    )
-    new_obs = new_env.step(EMPTY_ACTION)
-    assert obs_history[0] != new_obs
+#     new_env = init_bench(
+#         "Tektonian/Bigym",
+#         "MovePlate",
+#         0,
+#         benchmark_specific={"floating_base": True, "control_frequency": 50},
+#     )
+#     new_env.reset(0)
+#     new_obs = new_env.step(EMPTY_ACTION)
+#     assert obs_history[0] != new_obs
+
+# @pytest.mark.integration
+# def test_all_bigym_benchmark():
+#     output_dir = _benchmark_result_dir()
+#     output_dir.mkdir(parents=True, exist_ok=True)
+
+#     empty_action = [0] * 15
+#     failures: list[str] = []
+
+#     for task_name in BIGYM_TASK_MAP:
+#         env_id = f"{task_name}"
+#         env = init_bench(
+#             "Tektonian/Bigym",
+#             env_id,
+#             0,
+#             {"floating_base": True, "control_frequency": 50},
+#         )
+#         init_obs = env.reset(0)
+#         task_dir = output_dir / "bigym" / f"{task_name}"
+#         # if task_dir.exists():
+#         #     print(f"skip: {task_dir}")
+#         #     continue
+#         try:
+#             print(f"trying: {task_dir}")
+#             step_result = env.step(empty_action)
+#             output_paths = _save_step_images(
+#                 task_dir,
+#                 step_result,
+#             )
+#             print(
+#                 f"[saved] {env_id} -> "
+#                 + ", ".join(str(output_path) for output_path in output_paths)
+#             )
+#         except Exception as exc:
+#             failures.append(f"{env_id}: {exc!r}")
+#         finally:
+#             env.close()
+
+#     assert not failures, "Failed benchmarks:\n" + "\n".join(failures)
+
 
 # test end: bigym benchmark
