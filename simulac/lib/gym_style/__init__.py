@@ -40,7 +40,6 @@ def init_bench(
         benchmark_id (str): Full benchmark id.\n
             Example: benchmark_id="Tektonian/Libero"
         env_id (Optional[str]): Environment id of the benchmark.\n
-            `env_id=None` means run all benchmark list\n
             `env_id="libero_10"` means run all `"libero_10"` benchmark list\n
             `env_id="libero_10/TASK_EXAMPLE"` means run one specific test\n
             If you want to see the full list of the `env_id` visit https://tektonian.com/benchmark
@@ -76,9 +75,6 @@ def init_bench(
             )
         )
 
-    if env_id is None:
-        vec_env = BenchmarkVecEnvironment([])
-        return vec_env
 
     env = BenchmarkEnvironment(
         "id",
