@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import tempfile
@@ -19,6 +21,13 @@ class EnvvarKeyValue(StrEnum):
 
 
 class EnvvarService(IEnvvarService):
+    """
+    TODO: @gangjeuk
+    EnvvarService is not idle code
+    1. rename @property names
+    2. is it a good pattern to have directory location related codes here?
+    """
+
     BASE_URL = "https://tektonian.com/api"
 
     KEY_VALUE = EnvvarKeyValue
