@@ -368,3 +368,9 @@ class BenchmarkVecEnvironment:
                 idx = recv_futs[f]
                 results[idx] = f.result()
         return results
+    
+    def close(self):
+        with ThreadPoolExecutor(max_workers=len(self._benchmark_envs)) as ex:
+            close_futs = [ex.submit(env.close) for env in self._benchmark_envs]
+            for f in as_completed(close_futs):
+                f.result()
