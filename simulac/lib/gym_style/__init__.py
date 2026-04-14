@@ -91,7 +91,13 @@ def init_bench(
     return env
 
 
-def get_env_list(benchmark_id: str, group_id: Optional[str] = None) -> list[str]:
+def get_env_list(benchmark_id: str) -> list[str]:
+    # TODO: @gangjeuk
+    # Remove group_id later
+
+    # deprecated group_id
+    group_id = None
+
     runtime = obtain_runtime()
     if "/" not in benchmark_id:
         raise SimulacBaseError(
