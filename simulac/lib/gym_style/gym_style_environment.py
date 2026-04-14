@@ -21,8 +21,7 @@ GymEnvStepReturnType: TypeAlias = Type[
     Tuple[
         dict[str, Any],  # obs
         dict[str, Any],  # reward
-        bool,  # termination
-        bool,  # truncation
+        bool,  # done
         dict[str, Any],  # info
     ]
 ]
