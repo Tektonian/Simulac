@@ -50,6 +50,10 @@ class BenchmarkEnvironment:
         self._socket: ClientConnection | None = None
         self._ticket: str | None = None
 
+        # Warning message flags
+        self._has_reset = False
+        self._warned_step_before_reset = False
+
     def _create_ticket(self):
         url = f"{self._runtime.environment_variable.base_url}/container/{self.benchmark_id}/preflight"
         res = requests.post(
@@ -190,6 +194,18 @@ class BenchmarkEnvironment:
     def step(self, action: list[float]) -> GymEnvStepReturnType:
 
         socket = self._ensure_connected()
+
+        if not self._has_reset and not self._warned_step_before_reset:
+            self._runtime.logger.warn(
+                "\n".join(
+                    [
+                        "Unexpected behavior: step() was called before reset()."
+                        f"benchmark_id={self.benchmark_id!r}, env_id={self.env_id!r}"
+                    ]
+                )
+            )
+            self._warned_step_before_reset = True
+
         self._send_command(socket, "step", action=list(action))
         """
         NOTE: Transfered data size
@@ -253,9 +269,13 @@ class BenchmarkEnvironment:
                 },
             )
             raise err
+        self._has_reset = True
+        self._warned_step_before_reset = False
         return (obs, info)
 
     def close(self):
+        self._has_reset = False
+        self._warned_step_before_reset = False
         if self._socket is None:
             return
         try:
