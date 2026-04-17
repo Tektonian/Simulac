@@ -33,6 +33,12 @@ First of all, we **DO NOT** accept any AI-generated codes.
 
 Tektonian team believes that good code is an explainable code.
 If you do not fully understand the code you submit and cannot clearly explain its intend or purpose, adding it to the project only creates technical debt for others.
+
+## Development
+
+Please see [Development documents](./docs/internal/development.md) for detailed informations, such as project setup, testing, commit rules.
+
+# Thank you
 Your interest in this project and contributions all help this project improve.
 
 We sincerely appreciate the time and effort you have given to this project.
