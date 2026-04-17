@@ -11,37 +11,20 @@ from simulac.sdk.runtime import obtain_runtime
 from .gym_style_environment import BenchmarkEnvironment, BenchmarkVecEnvironment
 
 
-@overload
 def init_bench(
     benchmark_id: str,
     env_id: str,
     seed: int = 0,
     /,
     benchmark_specific: dict[str, Any] = {},
-) -> BenchmarkEnvironment: ...
-@overload
-def init_bench(
-    benchmark_id: str,
-    env_id: None,
-    seed: int = 0,
-    /,
-    benchmark_specific: dict[str, Any] = {},
-) -> BenchmarkVecEnvironment: ...
-def init_bench(
-    benchmark_id: str,
-    env_id: Optional[str],
-    seed: int = 0,
-    /,
-    benchmark_specific: dict[str, Any] = {},
-):
+) -> BenchmarkEnvironment:
     """Initalize benchmark service
 
     Args:
         benchmark_id (str): Full benchmark id.\n
-            Example: benchmark_id="Tektonian/Libero"
-        env_id (Optional[str]): Environment id of the benchmark.\n
-            `env_id="libero_10"` means run all `"libero_10"` benchmark list\n
-            `env_id="libero_10/TASK_EXAMPLE"` means run one specific test\n
+            Example: benchmark_id="Tektonian/Metaworld"
+        env_id (str): Environment id of the benchmark.\n
+            Example: envid="reach-v3"
             If you want to see the full list of the `env_id` visit https://tektonian.com/benchmark
         seed (int, optional): Seed for inital state. Defaults to 0.
         benchmark_specific (dict[str, Any], optional): Benchmark specific option field.\n
@@ -49,19 +32,26 @@ def init_bench(
             Defaults to {}.
 
     Returns:
-        ret (BenchmarkEnvironment|BenchmarkVecEnvironment):
+        ret (BenchmarkEnvironment):
     """
     runtime = obtain_runtime()
     split_benchmark_id = benchmark_id.split("/")
     normalized_benchmark_id = benchmark_id.strip()
 
-    if len(split_benchmark_id) != 2:
+    MESSAGE = "\n".join(
+        [
+            f"Invalid benchmark_id {benchmark_id!r}. ",
+            "Expected '<organization>/<benchmark>', (e.g., 'Tektonian/Metaworld')",
+        ]
+    )
+    if len(split_benchmark_id) == 1:
+        raise SimulacBaseError(MESSAGE)
+    elif len(split_benchmark_id) != 2:
         runtime.logger.warn(
             "\n".join(
                 [
-                    f"Invalid benchmark_id {benchmark_id!r}. ",
-                    "Expected '<organization>/<benchmark>', ",
-                    "for example 'Tektonian/Libero'.",
+                    MESSAGE,
+                    f"Unused fields: '{split_benchmark_id[2:]}' will be removed",
                 ]
             )
         )
@@ -75,10 +65,12 @@ def init_bench(
             )
         )
 
+    # Rename
+    (owner_id, world_id) = split_benchmark_id
 
     env = BenchmarkEnvironment(
-        "id",
-        benchmark_id,
+        owner_id,
+        world_id,
         env_id,
         seed,
         benchmark_specific,

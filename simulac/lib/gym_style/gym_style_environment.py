@@ -32,26 +32,32 @@ GymEnvResetReturnType: TypeAlias = Tuple[
 class BenchmarkEnvironment:
     def __init__(
         self,
-        runner_id: str,
-        benchmark_id: str,
-        remote_env_id: str,
+        owner_id: str,
+        world_id: str,
+        env_id: str,
         seed: int,
         benchmark_specific_kwargs: dict[str, Any],
     ):
 
         self._runtime = obtain_runtime()
 
-        self.runner_id = runner_id
-        self.benchmark_id = benchmark_id
-        self.remote_env_id = remote_env_id
+        self.runner_id = str("")
+        self.owner_id = owner_id
+        self.world_id = world_id
+        self.benchmark_id = f"{owner_id}/{world_id}"
+        self.env_id = env_id
         self.benchmark_specific_kwargs = benchmark_specific_kwargs
         self.init_seed = seed
 
         self._socket: ClientConnection | None = None
         self._ticket: str | None = None
 
+        # Warning message flags
+        self._has_reset = False
+        self._warned_step_before_reset = False
+
     def _create_ticket(self):
-        url = f"{self._runtime.environment_variable.base_url}/container/{self.benchmark_id}/preflight"
+        url = f"{self._runtime.environment_variable.base_url}/container/{self.owner_id}/{self.world_id}/preflight"
         res = requests.post(
             url,
             headers={"tt-apikey": self._get_api_key()},
@@ -94,7 +100,7 @@ class BenchmarkEnvironment:
             scheme=ws_scheme,
             path=os.path.join(
                 base_url.path,
-                f"container/{self.benchmark_id}",
+                f"container/{self.owner_id}/{self.world_id}",
             ),
             query=query_param,
         ).geturl()
@@ -162,7 +168,7 @@ class BenchmarkEnvironment:
         self._send_command(
             socket,
             "build_env",
-            env_id=self.remote_env_id,
+            env_id=self.env_id,
             seed=self.init_seed,
             **self.benchmark_specific_kwargs,
         )
@@ -170,7 +176,7 @@ class BenchmarkEnvironment:
 
         self._runtime.logger.debug(
             "Benchmark environment is ready. "
-            f"benchmark_id={self.benchmark_id!r}, env_id={self.remote_env_id!r}"
+            f"benchmark_id={self.benchmark_id!r}, env_id={self.env_id!r}"
         )
         return socket
 
@@ -190,6 +196,18 @@ class BenchmarkEnvironment:
     def step(self, action: list[float]) -> GymEnvStepReturnType:
 
         socket = self._ensure_connected()
+
+        if not self._has_reset and not self._warned_step_before_reset:
+            self._runtime.logger.warn(
+                "\n".join(
+                    [
+                        "Unexpected behavior: step() was called before reset()."
+                        f"benchmark_id={self.benchmark_id!r}, env_id={self.env_id!r}"
+                    ]
+                )
+            )
+            self._warned_step_before_reset = True
+
         self._send_command(socket, "step", action=list(action))
         """
         NOTE: Transfered data size
@@ -231,6 +249,7 @@ class BenchmarkEnvironment:
         self._send_command(socket, "reset", seed=seed)
         rcvd = self._receive_packed_message(socket)
         try:
+            self.runner_id = rcvd.get("id", "")
             obs: dict = rcvd["obs"]
             info: dict = rcvd["info"]
         except KeyError as err:
@@ -253,9 +272,13 @@ class BenchmarkEnvironment:
                 },
             )
             raise err
+        self._has_reset = True
+        self._warned_step_before_reset = False
         return (obs, info)
 
     def close(self):
+        self._has_reset = False
+        self._warned_step_before_reset = False
         if self._socket is None:
             return
         try:
