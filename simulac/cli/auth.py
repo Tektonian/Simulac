@@ -7,22 +7,23 @@ import typer
 
 # FIXME: import raw service is anti-pattern
 from simulac.base.envvar.envvar_service import EnvvarService
+from simulac.base.error.error import SimulacBaseError
 
-TOKEN_PORTAL_URL = "https://tektonian.com/settings/token"
+from .common import (
+    TOKEN_PORTAL_URL,
+    fetch_identity,
+    get_token_state,
+    mask_secret,
+    read_token,
+)
 
-APP_HELP = "Simulac CLI\n\n"
-
-
-APP_EPILOG = "\n\n".join(
+AUTH_EPILOG = "\n\n".join(
     [
-        "If you are new to Simulac, start with `simulac login` and paste an API "
-        f"key from {TOKEN_PORTAL_URL}.\n\n"
-        "\n\nLearn more\n",
-        "If you want to know detail about Simulac visit https://tektonian.com/docs\n\n",
+        "\b",
         "Examples:",
-        "-  $ simulac login",
-        "-  $ simulac login --apikey tt_sim_your_api_key",
-        "-  $ simulac logout",
+        "  $ simulac auth whoami",
+        "  $ simulac auth login",
+        "  $ simulac auth logout",
     ]
 )
 
@@ -37,32 +38,6 @@ app = typer.Typer(
 def _save_token(token_path: Path, token: str) -> None:
     token_path.parent.mkdir(parents=True, exist_ok=True)
     token_path.write_text(token.strip() + "\n", encoding="utf-8")
-
-
-def _read_token(token_path: Path) -> str | None:
-    if not token_path.exists() or not token_path.is_file():
-        return None
-
-    lines = token_path.read_text(encoding="utf-8").splitlines()
-    if not lines:
-        return None
-
-    token = lines[0].strip()
-    return token or None
-
-
-def _mask_secret(secret: str | None) -> str:
-    """Return masked api key
-
-    Args:
-        secret (str | None): Api key value. Should look like `tt_sim_***
-
-    Returns:
-        str: Masked API key string with only the prefix visible
-    """
-    if not secret:
-        return "preview unavailable"
-    return f"{secret[: len('tt_sim_')]}..."
 
 
 @app.command(
@@ -89,36 +64,38 @@ def login(
     env = EnvvarService()
 
     if apikey is None:
-        typer.echo("No API key provided. Nothing was saved.")
+        typer.echo("No API key provided. Nothing was saved.", err=True)
         raise typer.Exit(code=1)
 
     clean_apikey = apikey.strip()
     if not clean_apikey:
         typer.echo(
-            "The API key was empty after trimming whitespace. Nothing was saved."
+            "The API key was empty after trimming whitespace. Nothing was saved.",
+            err=True,
         )
         raise typer.Exit(code=1)
 
     _save_token(env.token_path, clean_apikey)
 
-    typer.echo(f"Saved: Simulac API key ({_mask_secret(clean_apikey)})")
+    typer.echo(f"Saved: Simulac API key ({mask_secret(clean_apikey)})")
     typer.echo(f"Location: {env.token_path}")
 
 
 @app.command(
+    "logout",
     short_help="Delete the locally stored API key.",
     help=(
         "Remove the API key stored in the local credential cache.\n\n"
-        "This deletes the local file created by `simulac login` when it exists. "
+        "This deletes the local file created by `simulac auth login` when it exists."
     ),
 )
 def logout() -> None:
     env = EnvvarService()
-    stored_token = _read_token(env.token_path)
+    stored_token = read_token(env.token_path)
 
     if env.token_path.exists():
         env.token_path.unlink(missing_ok=True)
-        typer.echo(f"Removed: API key ({_mask_secret(stored_token)})")
+        typer.echo(f"Removed: API key ({mask_secret(stored_token)})")
         typer.echo(f"Location: {env.token_path}")
         typer.echo("Deleted file: local plain-text credential cache.")
     else:
