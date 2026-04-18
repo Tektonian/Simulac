@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Annotated
 
@@ -32,39 +29,9 @@ APP_EPILOG = "\n\n".join(
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help=APP_HELP,
-    epilog=APP_EPILOG,
+    help="Authentication commands.",
+    epilog=AUTH_EPILOG,
 )
-
-
-def _package_version() -> str:
-    try:
-        return pkg_version("simulac")
-    except PackageNotFoundError:
-        return "unknown"
-
-
-def _show_version(value: bool) -> None:
-    if not value:
-        return
-
-    typer.echo(f"simulac {_package_version()}")
-    raise typer.Exit()
-
-
-@app.callback()
-def cli(
-    version: Annotated[
-        bool,
-        typer.Option(
-            "--version",
-            help="Show the installed simulac version and exit.",
-            callback=_show_version,
-            is_eager=True,
-        ),
-    ] = False,
-) -> None:
-    """Authenticate this machine with Simulac."""
 
 
 def _save_token(token_path: Path, token: str) -> None:
