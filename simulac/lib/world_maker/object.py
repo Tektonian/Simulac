@@ -5,6 +5,8 @@ from typing import List, Literal, Tuple, overload
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
 from simulac.sdk.environment_service.common.model.entity import (
+    EnvironmentCameraEntity,
+    EnvironmentLightEntity,
     EnvironmentMachineEntity,
     EnvironmentStuffEntity,
 )
@@ -69,7 +71,7 @@ class Environment:
 
         if isinstance(entity, Stuff):
             env_stuff_obj = self._world_maker.create_stuff_entity(
-                entity.name, entity.obj_uri_or_prebuilt_name, "", ""
+                entity.name or "", entity.obj_uri_or_prebuilt_name, "", ""
             )
             self._world_maker.add_entity(
                 self._env.id, env_stuff_obj, pos=pos, quat=quat
@@ -77,10 +79,22 @@ class Environment:
             return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
             env_robot_obj = self._world_maker.create_machine_entity(
-                entity.name, entity.obj_uri_or_prebuilt_name
+                entity.name or "", entity.obj_uri_or_prebuilt_name
             )
             self._world_maker.add_entity(self._env.id, env_robot_obj)
             return RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL)
+        elif isinstance(entity, Camera):
+            env_camera_obj = self._world_maker.create_camera_entity(
+                entity.name or "", entity.type
+            )
+            self._world_maker.add_entity(self._env.id, env_camera_obj)
+            return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
+        elif isinstance(entity, Light):  # pyright: ignore[reportUnnecessaryIsInstance]
+            env_light_obj = self._world_maker.create_light_entity(
+                entity.name or "", entity.type
+            )
+            self._world_maker.add_entity(self._env.id, env_light_obj)
+            return LightObject(env_light_obj, _create_sentinal=_CREATE_SENTINAL)
         else:
             raise NotImplementedError("Camera and light are not implemented")
 
@@ -150,13 +164,29 @@ class RobotObject:
 
 
 class CameraObject:
-    def __init__(self):
-        """not implemented yet"""
+    def __init__(
+        self,
+        entity: EnvironmentCameraEntity,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+        self._entity = entity
 
 
 class LightObject:
-    def __init__(self):
-        """not implemented yet"""
+    def __init__(
+        self,
+        entity: EnvironmentLightEntity,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+        self._entity = entity
 
 
 # region Will be implemented
