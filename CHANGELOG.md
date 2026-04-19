@@ -1,4 +1,27 @@
 # Changelog
+
+## 0.0.3 (2026-04-19)
+
+Expand the CLI commands, fixed world-maker entity ID generation, and refactor the gym-style environment code.
+
+### Features
+
+* **cli:** expand CLI commands and add runtime context ([#24](https://github.com/Tektonian/Simulac/pull/24)) ([79cfefb](https://github.com/Tektonian/Simulac/commit/79cfefb))
+
+### Bug Fixes
+
+* **sdk:** generate `entity_id` of world maker from the correct entities ([#22](https://github.com/Tektonian/Simulac/pull/22)) ([26a6594](https://github.com/Tektonian/Simulac/commit/26a6594))
+
+### Refactoring
+
+* **lib:** refactor `step` and `reset` handling in `BenchmarkVecEnvironment` ([#19](https://github.com/Tektonian/Simulac/pull/19)) ([a766200](https://github.com/Tektonian/Simulac/commit/a766200))
+* **lib:** clean up `init_bench` and warn when gym-style environments call `step()` before `reset()` ([#20](https://github.com/Tektonian/Simulac/pull/20)) ([2d95893](https://github.com/Tektonian/Simulac/commit/2d95893))
+
+### Chores
+
+* **project:** prepare the `0.0.3` release, update physics engine versions, and add a development guide ([#23](https://github.com/Tektonian/Simulac/pull/23)) ([73e17a8](https://github.com/Tektonian/Simulac/commit/73e17a8))
+
+
 ## 0.0.2 (2026-04-14)
 
 Added missing packages and mostly focused on bug fixing.
@@ -14,7 +37,7 @@ Added missing packages and mostly focused on bug fixing.
 
 * **project:** add missed `requests` package ([0fd6fc1](https://github.com/Tektonian/Simulac/commit/0fd6fc1))
 
-### Miscellaneous Chores
+### Chores
 
 * **project:** change required Python version to 3.12 ([c2081f1](https://github.com/Tektonian/Simulac/commit/c2081f1))
 * **project:** prepare `0.0.2` release, clean code, and update README ([6af725c](https://github.com/Tektonian/Simulac/commit/6af725c))

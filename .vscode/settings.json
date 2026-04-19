@@ -4,22 +4,10 @@
         "editor.codeActionsOnSave": {
             "source.organizeImports.ruff": "explicit"
         },
-        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.defaultFormatter": "charliermarsh.ruff"
     },
     "ruff.nativeServer": "on",
     "python.languageServer": "Pylance",
-    "python.linting.mypyEnabled": true,
-    "python.linting.mypyArgs": [
-        "--follow-imports=silent",
-        "--ignore-missing-imports",
-        "--show-column-numbers",
-        "--no-pretty"
-    ],
     "terminal.integrated.shellIntegration.enabled": false,
-    "python.analysis.inlayHints.variableTypes": true,
-    "python.analysis.inlayHints.functionReturnTypes": true,
-    "python.analysis.inlayHints.callArgumentNames": "all",
-    "python.analysis.autoImportCompletions": true,
     "git.decorations.enabled": false
-
 }

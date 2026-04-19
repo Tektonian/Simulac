@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "simulac"
-version = "0.0.2"
+version = "0.0.3"
 description = "A CLI, library, and local server for interacting with the Tektonian backend."
 authors = [{ name = "Jeuk Kang", email = "gangjeuk@tektonian.com" }]
 keywords = [
@@ -97,7 +97,7 @@ docstring-code-format = true
 exclude = ["trash"]
 
 [tool.pyright]
-stubPath = ".typings"
+stubPath = ".typing"
 typeCheckingMode = "strict"
 
 [tool.ruff.lint.isort]
