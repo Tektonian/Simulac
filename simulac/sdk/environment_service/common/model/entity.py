@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Literal, Optional, Tuple
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 class EnvironmentCameraEntity:
     def __init__(
         self,
+        id: str | None,
         name: str,
         description: str,
         type: Literal[
@@ -30,6 +31,7 @@ class EnvironmentCameraEntity:
         near: float = 100.0,
         far: float = 1000.0,
     ) -> None:
+        self.id = id
         self.name = name
         self.description = description
         self.type = type
@@ -46,32 +48,41 @@ class EnvironmentCameraEntity:
 class EnvironmentMachineEntity:
     def __init__(
         self,
+        id: str | None,
         name: str,
         description: str,
         uri: str,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
     ) -> None:
+        self.id = id
         self.name = name
         self.description = description
         self.uri = uri
         self.pos = pos
         self.quat = quat
 
-        self.init_position: List[float] | None = None
-        self.action_min: List[float] | None = None
-        self.action_max: List[float] | None = None
+        # Should have same length
+        self.init_position: list[float] | None = None
+        self.action_min: list[float] | None = None
+        self.action_max: list[float] | None = None
 
 
 class EnvironmentLightEntity:
     def __init__(
         self,
+        id: str | None,
+        name: str,
+        description: str,
         type: Literal["ambient", "pointlight", "reactarea", "spot"],
-        color: str,
+        color: Tuple[int, int, int],
         intensity: float = 0.8,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
     ) -> None:
+        self.id = id
+        self.name = name
+        self.description = description
         self.type = type
         self.color = color
         self.intensity = intensity
@@ -82,16 +93,19 @@ class EnvironmentLightEntity:
 class EnvironmentStuffEntity:
     def __init__(
         self,
+        id: str | None,
+        name: str,
+        description: str,
         rendering: RenderingComponent,
         physics: MJCFPhysicsComponent | URDFPhysicsComponent | USDPhysicsComponent,
-        name: Optional[str] = None,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
         size: Tuple[float, float, float] = (1, 1, 1),
         fixed: bool = True,
     ) -> None:
-        self.id = f"env_stu_{uuid4().hex}"
+        self.id = id
         self.name = name
+        self.description = description
         self.physics = physics
         self.rendering = rendering
 
