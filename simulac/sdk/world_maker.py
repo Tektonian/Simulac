@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from simulac.base.error.error import SimulacBaseError
 from simulac.sdk.environment_service.common.environment_service import (
     IEnvironmentManagementService,
 )
@@ -121,7 +122,6 @@ class WorldMakerFacade:
             raise env_ret[1]
 
         env = env_ret[0]
-
         entity_id = ""
 
         if isinstance(entity, EnvironmentStuffEntity):
@@ -129,13 +129,16 @@ class WorldMakerFacade:
             entity_id = f"ent_stu_{len(env.objects)}"
         elif isinstance(entity, EnvironmentMachineEntity):
             env.machines.append(entity)
-            entity_id = f"ent_mac_{len(env.objects)}"
+            entity_id = f"ent_mac_{len(env.machines)}"
         elif isinstance(entity, EnvironmentCameraEntity):
             env.cameras.append(entity)
-            entity_id = f"ent_cam_{len(env.objects)}"
+            entity_id = f"ent_cam_{len(env.cameras)}"
         elif isinstance(entity, EnvironmentLightEntity):
             env.lights.append(entity)
-            entity_id = f"ent_lig_{len(env.objects)}"
+            entity_id = f"ent_lig_{len(env.lights)}"
+        else:
+            # Should not reach
+            raise SimulacBaseError(f"Unknown environment entity type: {entity}")
 
         return entity_id
 
