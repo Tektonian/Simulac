@@ -11,6 +11,9 @@ from simulac.sdk.environment_service.common.model.entity import (
 
 from .entity import Camera, Light, Robot, Stuff
 
+# Sentinal pattern: https://python-patterns.guide/python/sentinel-object/
+_CREATE_SENTINAL = object()
+
 
 class Environment:
     """TODO:
@@ -71,14 +74,13 @@ class Environment:
             self._world_maker.add_entity(
                 self._env.id, env_stuff_obj, pos=pos, quat=quat
             )
-            return StuffObject(env_stuff_obj, _prevent_user_direct_call=False)
+            return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
             env_robot_obj = self._world_maker.create_machine_entity(
                 entity.name, entity.obj_uri_or_prebuilt_name
             )
             self._world_maker.add_entity(self._env.id, env_robot_obj)
-
-            return RobotObject(env_robot_obj, _prevent_user_direct_call=False)
+            return RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL)
         else:
             raise NotImplementedError("Camera and light are not implemented")
 
@@ -117,9 +119,9 @@ class StuffObject:
         entity: EnvironmentStuffEntity,
         /,
         *,
-        _prevent_user_direct_call: bool = True,
+        _create_sentinal: object,
     ) -> None:
-        if _prevent_user_direct_call == True:
+        if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
 
         self._entity = entity
@@ -137,9 +139,9 @@ class RobotObject:
         entity: EnvironmentMachineEntity,
         /,
         *,
-        _prevent_user_direct_call: bool = True,
+        _create_sentinal: object,
     ) -> None:
-        if _prevent_user_direct_call == True:
+        if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
 
         self._entity = entity
