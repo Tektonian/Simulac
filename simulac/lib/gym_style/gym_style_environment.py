@@ -85,7 +85,7 @@ class BenchmarkEnvironment:
                 [
                     "API key for the remote benchmark service was not found.",
                     "Get a token at https://tektonian.com/settings/token.",
-                    "Then run `simulac login` in your terminal and paste the API key.",
+                    "Then run `simulac auth login` in your terminal and paste the API key.",
                 ]
             )
             self._runtime.logger.error(_API_KEY_ERROR_MESSAGE)

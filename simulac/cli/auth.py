@@ -111,7 +111,7 @@ def whoami(ctx: typer.Context) -> None:
 
     if token_state.status != "PRESENT" or token_state.value is None:
         typer.echo(
-            "A valid API key is required. Run `simulac login` or set `SIMULAC_API_KEY`.",
+            "A valid API key is required. Run `simulac auth login` or set `SIMULAC_API_KEY`.",
             err=True,
         )
         raise typer.Exit(code=1)

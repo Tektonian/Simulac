@@ -17,10 +17,10 @@ APP_HELP = "Simulac CLI"
 
 APP_EPILOG = "\n\n".join(
     [
-        "If you are new to Simulac, start with `simulac login` and paste an API "
+        "If you are new to Simulac, start with `simulac auth login` and paste an API "
         f"key from {TOKEN_PORTAL_URL}.",
         "Examples:",
-        "-  $ simulac auth status",
+        "-  $ simulac auth login",
         "-  $ simulac auth whoami",
         "-  $ simulac benchmark list Tektonian/Metaworld",
         "-  $ simulac env",
