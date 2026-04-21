@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Tuple, overload
+from typing import List, Literal, Tuple, final, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
@@ -18,10 +18,6 @@ _CREATE_SENTINAL = object()
 
 
 class Environment:
-    """TODO:
-    1. Do not create ~Ojbect directly, add create_object or else in EnvironmentBuildService
-    """
-
     def __init__(
         self,
         default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
@@ -40,6 +36,7 @@ class Environment:
         entity: Stuff,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        description: str | None = None,
     ) -> StuffObject: ...
     @overload
     def place_entity(
@@ -47,6 +44,7 @@ class Environment:
         entity: Camera,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        description: str | None = None,
     ) -> CameraObject: ...
     @overload
     def place_entity(
@@ -54,6 +52,7 @@ class Environment:
         entity: Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        description: str | None = None,
     ) -> LightObject: ...
     @overload
     def place_entity(
@@ -61,17 +60,20 @@ class Environment:
         entity: Robot,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        description: str | None = None,
     ) -> RobotObject: ...
     def place_entity(
         self,
         entity: Stuff | Robot | Camera | Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        description: str | None = None,
     ) -> StuffObject | RobotObject | CameraObject | LightObject:
+        description = description or ""
 
         if isinstance(entity, Stuff):
             env_stuff_obj = self._world_maker.create_stuff_entity(
-                entity.name or "", entity.obj_uri_or_prebuilt_name, "", ""
+                entity.name or "", description, entity.obj_uri_or_prebuilt_name, "", ""
             )
             self._world_maker.add_entity(
                 self._env.id, env_stuff_obj, pos=pos, quat=quat
@@ -79,24 +81,63 @@ class Environment:
             return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
             env_robot_obj = self._world_maker.create_machine_entity(
-                entity.name or "", entity.obj_uri_or_prebuilt_name
+                entity.name or "", description, entity.obj_uri_or_prebuilt_name
             )
-            self._world_maker.add_entity(self._env.id, env_robot_obj)
+            self._world_maker.add_entity(
+                self._env.id, env_robot_obj, pos=pos, quat=quat
+            )
             return RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Camera):
             env_camera_obj = self._world_maker.create_camera_entity(
-                entity.name or "", entity.type
+                entity.name, description, entity.type
             )
-            self._world_maker.add_entity(self._env.id, env_camera_obj)
+            self._world_maker.add_entity(
+                self._env.id, env_camera_obj, pos=pos, quat=quat
+            )
             return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Light):  # pyright: ignore[reportUnnecessaryIsInstance]
             env_light_obj = self._world_maker.create_light_entity(
-                entity.name or "", entity.type
+                entity.name, description, entity.type
             )
-            self._world_maker.add_entity(self._env.id, env_light_obj)
+            self._world_maker.add_entity(
+                self._env.id, env_light_obj, pos=pos, quat=quat
+            )
             return LightObject(env_light_obj, _create_sentinal=_CREATE_SENTINAL)
         else:
             raise NotImplementedError("Camera and light are not implemented")
+
+    @overload
+    def remove_object(
+        self,
+        object_or_object_id: StuffObject | RobotObject | CameraObject | LightObject,
+    ) -> None: ...
+    @overload
+    def remove_object(self, object_or_object_id: str) -> None: ...
+    def remove_object(
+        self,
+        object_or_object_id: StuffObject
+        | RobotObject
+        | CameraObject
+        | LightObject
+        | str,
+    ) -> None:
+        pass
+
+    def get_object(
+        self, object_id: str
+    ) -> StuffObject | RobotObject | CameraObject | LightObject: ...
+
+    def dump_env(self) -> dict:
+        """Return definition of environment.
+        Return type `dict` is json format
+
+        Raises:
+            SimulacBaseError: _description_
+
+        Returns:
+            dict: json format environment definition
+        """
+        ...
 
 
 class Runner:
@@ -141,10 +182,10 @@ class StuffObject:
         self._entity = entity
 
     def set_mass(self, mass: float) -> None: ...
-
-    def set_posture(self, pos: List[float]) -> None: ...
-
-    def set_quat(self, quat: Tuple[float, float, float, float]) -> None: ...
+    def set_pos(self, pos: tuple[float, float, float]) -> None: ...
+    def set_rot(self, rot: tuple[float, float, float]) -> None: ...
+    def set_size(self, size: tuple[float, float, float]) -> None: ...
+    def set_fixed(self, is_fixed: bool) -> None: ...
 
 
 class RobotObject:
@@ -160,7 +201,12 @@ class RobotObject:
 
         self._entity = entity
 
-    def set_posture(self, pos: List[float]) -> None: ...
+    def set_pos(self, pos: tuple[float, float, float]) -> None: ...
+    def set_rot(self, rot: tuple[float, float, float]) -> None: ...
+    def set_act_pos(self, pos: list[float]) -> None: ...
+
+    def get_act_min(self) -> list[float]: ...
+    def get_act_max(self) -> list[float]: ...
 
 
 class CameraObject:
