@@ -31,12 +31,29 @@ class Environment:
         default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
         env_uri_or_prebuilt_id: str | None = None,
     ) -> None:
-        self._world_maker = obtain_runtime().world_maker
+        self._runtime = obtain_runtime()
+        self._world_maker = self._runtime.world_maker
 
         self.default_engine = default_engine
         self._env = self._world_maker.create_environment(
             default_engine, env_uri_or_prebuilt_id
         )
+        self.__frozen = False
+
+    def _freeze(self):
+        self.__frozen = True
+
+    def _assert_mutable(self):
+        if self.__frozen:
+            raise SimulacBaseError(
+                "\n".join(
+                    [
+                        "You are trying to change definition of Environment after Runner creation",
+                        "Use runner.get_runtime_object(obj).change_*() to mutate runtime state",
+                        "It is not illegal, but we intentionally forbidden such actions",
+                    ]
+                )
+            )
 
     @overload
     def place_entity(
@@ -269,6 +286,8 @@ class Runner:
         self._world_maker = obtain_runtime().world_maker
 
         self._runner = self._world_maker.create_runner(env._env.id)
+
+        env._freeze()
 
     def step(self, action: List[float]):
         self._runner.step(action)
