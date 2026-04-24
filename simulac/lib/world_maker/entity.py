@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import Generic, Literal, Sequence, TypeVar, Union
 
-from .randomize import RandomizableVec3, RandomizableFloat
+from typing_extensions import TypeVar
+
+from .randomize import RandomizableFloat, RandomizableVec3
+
+ActionT = TypeVar("ActionT", bound=Sequence[float], default=list[float])
+
 
 class Stuff:
     def __init__(self, obj_uri_or_prebuilt_name: str, name: str | None = None) -> None:
@@ -10,7 +15,7 @@ class Stuff:
         self.obj_uri_or_prebuilt_name = obj_uri_or_prebuilt_name
 
 
-class Robot:
+class Robot(Generic[ActionT]):
     def __init__(self, obj_uri_or_prebuilt_name: str, name: str | None = None) -> None:
         self.name = name
         self.obj_uri_or_prebuilt_name = obj_uri_or_prebuilt_name

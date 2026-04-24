@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Tuple, overload
+from typing import Any, Generic, List, Literal, Tuple, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
@@ -11,12 +11,12 @@ from simulac.sdk.environment_service.common.model.entity import (
     EnvironmentStuffEntity,
 )
 
-from .entity import Camera, Light, Robot, Stuff
+from .entity import ActionT, Camera, Light, Robot, Stuff
 from .randomize import (
+    Randomizable,
     RandomizableBool,
     RandomizableColor,
     RandomizableFloat,
-    RandomizableFloatList,
     RandomizableVec3,
     Vec3,
 )
@@ -65,18 +65,18 @@ class Environment:
     @overload
     def place_entity(
         self,
-        entity: Robot,
+        entity: Robot[ActionT],
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
         description: str | None = None,
-    ) -> RobotObject: ...
+    ) -> RobotObject[ActionT]: ...
     def place_entity(
         self,
-        entity: Stuff | Robot | Camera | Light,
+        entity: Stuff | Robot[ActionT] | Camera | Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
         description: str | None = None,
-    ) -> StuffObject | RobotObject | CameraObject | LightObject:
+    ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
         description = description or ""
 
         if isinstance(entity, Stuff):
@@ -94,7 +94,10 @@ class Environment:
             self._world_maker.add_entity(
                 self._env.id, env_robot_obj, pos=pos, quat=quat
             )
-            return RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL)
+            return cast(
+                "RobotObject[ActionT]",
+                RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
+            )
         elif isinstance(entity, Camera):
             env_camera_obj = self._world_maker.create_camera_entity(
                 entity.name, description, entity.type
@@ -117,14 +120,17 @@ class Environment:
     @overload
     def remove_object(
         self,
-        object_or_object_id: StuffObject | RobotObject | CameraObject | LightObject,
+        object_or_object_id: StuffObject
+        | RobotObject[Any]
+        | CameraObject
+        | LightObject,
     ) -> None: ...
     @overload
     def remove_object(self, object_or_object_id: str) -> None: ...
     def remove_object(
         self,
         object_or_object_id: StuffObject
-        | RobotObject
+        | RobotObject[Any]
         | CameraObject
         | LightObject
         | str,
@@ -133,7 +139,7 @@ class Environment:
 
     def get_object(
         self, object_id: str
-    ) -> StuffObject | RobotObject | CameraObject | LightObject: ...
+    ) -> StuffObject | RobotObject[Any] | CameraObject | LightObject: ...
 
     def dump_env(self) -> dict:
         """Return definition of environment.
@@ -170,7 +176,7 @@ class StuffObject:
     def set_density(self, density: RandomizableFloat) -> None: ...
 
 
-class RobotObject:
+class RobotObject(Generic[ActionT]):
     def __init__(
         self,
         entity: EnvironmentMachineEntity,
@@ -185,10 +191,10 @@ class RobotObject:
 
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_act_pos(self, pos: RandomizableFloatList) -> None: ...
+    def set_act_pos(self, pos: Randomizable[ActionT]) -> None: ...
 
-    def get_act_min(self) -> list[float]: ...
-    def get_act_max(self) -> list[float]: ...
+    def get_act_min(self) -> ActionT: ...
+    def get_act_max(self) -> ActionT: ...
 
 
 class CameraObject:
@@ -267,14 +273,16 @@ class Runner:
     @overload
     def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
     @overload
-    def get_runtime_object(self, obj: RobotObject) -> RobotRuntime: ...
+    def get_runtime_object(
+        self, obj: RobotObject[ActionT]
+    ) -> RobotRuntime[ActionT]: ...
     @overload
     def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
     @overload
     def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
     def get_runtime_object(
-        self, obj: StuffObject | RobotObject | LightObject | CameraObject
-    ) -> StuffRuntime | RobotRuntime | LightRuntime | CameraRuntime: ...
+        self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
+    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime: ...
 
     def _debug_render(self):
         return self._runner._debug_render()
@@ -298,7 +306,7 @@ class StuffRuntime:
     def change_density(self, density: float) -> None: ...
 
 
-class RobotRuntime:
+class RobotRuntime(Generic[ActionT]):
     def __init__(
         self,
         /,
@@ -308,7 +316,7 @@ class RobotRuntime:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
 
-    def step(self, action: list[float]) -> None: ...
+    def step(self, action: ActionT) -> None: ...
     def tick(self) -> None: ...
 
     def get_pos(self) -> Vec3: ...
