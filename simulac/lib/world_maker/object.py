@@ -18,6 +18,7 @@ from .randomize import (
     RandomizableFloat,
     RandomizableFloatList,
     RandomizableVec3,
+    Vec3,
 )
 
 # Sentinal pattern: https://python-patterns.guide/python/sentinel-object/
@@ -147,34 +148,6 @@ class Environment:
         ...
 
 
-class Runner:
-    def __init__(
-        self,
-        env: Environment,
-        seed: int | None = 0,
-        tick: int | None = 5,  # 5ms
-        /,
-        *,
-        runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
-    ):
-        self.seed = seed
-        self.tick_time = tick
-
-        self._world_maker = obtain_runtime().world_maker
-
-        self._runner = self._world_maker.create_runner(env._env.id)
-
-    def step(self, action: List[float]):
-        self._runner.step(action)
-
-    def tick(self): ...
-
-    def get_state(self): ...
-
-    def _debug_render(self):
-        return self._runner._debug_render()
-
-
 class StuffObject:
     def __init__(
         self,
@@ -195,6 +168,8 @@ class StuffObject:
     def set_fixed(self, is_fixed: RandomizableBool) -> None: ...
     def set_friction(self, friction: RandomizableFloat) -> None: ...
     def set_density(self, density: RandomizableFloat) -> None: ...
+
+
 class RobotObject:
     def __init__(
         self,
@@ -263,6 +238,114 @@ class LightObject:
         self, type: Literal["ambient", "pointlight", "reactarea", "spot"]
     ) -> None: ...
     def set_color(self, color: RandomizableColor) -> None: ...
+
+
+class Runner:
+    def __init__(
+        self,
+        env: Environment,
+        seed: int | None = 0,
+        tick: int | None = 5,  # 5ms
+        /,
+        *,
+        runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
+    ):
+        self.seed = seed
+        self.tick_time = tick
+
+        self._world_maker = obtain_runtime().world_maker
+
+        self._runner = self._world_maker.create_runner(env._env.id)
+
+    def step(self, action: List[float]):
+        self._runner.step(action)
+
+    def tick(self): ...
+
+    def get_state(self): ...
+
+    @overload
+    def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: RobotObject) -> RobotRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
+    def get_runtime_object(
+        self, obj: StuffObject | RobotObject | LightObject | CameraObject
+    ) -> StuffRuntime | RobotRuntime | LightRuntime | CameraRuntime: ...
+
+    def _debug_render(self):
+        return self._runner._debug_render()
+
+
+class StuffRuntime:
+    def __init__(
+        self,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+
+    def change_mass(self, mass: float) -> None: ...
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_size(self, size: Vec3) -> None: ...
+    def change_fixed(self, is_fixed: bool) -> None: ...
+    def change_friction(self, friction: float) -> None: ...
+    def change_density(self, density: float) -> None: ...
+
+
+class RobotRuntime:
+    def __init__(
+        self,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+
+    def step(self, action: list[float]) -> None: ...
+    def tick(self) -> None: ...
+
+    def get_pos(self) -> Vec3: ...
+    def get_vel(self) -> list[float]: ...
+
+
+class CameraRuntime:
+    def __init__(
+        self,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_rot(self, rot: Vec3) -> None: ...
+
+
+class LightRuntime:
+    def __init__(
+        self,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create stuff object directly")
+
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_rot(self, rot: Vec3) -> None: ...
+    def change_intensity(self, intensity: float) -> None: ...
+    def change_color(self, color: tuple[float, float, float]) -> None: ...
+
+    # Needed?
+    def __change_type(self): ...
 
 
 # region Will be implemented
