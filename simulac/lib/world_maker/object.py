@@ -55,6 +55,8 @@ class Environment:
                 )
             )
 
+    # NOTE: @gangjeuk
+    # Should be `place()`?
     @overload
     def place_entity(
         self,
@@ -100,7 +102,7 @@ class Environment:
         description: str | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
         description = description or ""
-
+        name = name or ""  # TODO: @gangjeuk / rename based on object_url if it is None
         if isinstance(entity, Stuff):
             env_stuff_obj = self._world_maker.create_stuff_entity(
                 name, description, entity.obj_uri_or_prebuilt_name, "", ""
@@ -189,7 +191,11 @@ class StuffObject:
 
         self._entity = entity
 
-    def set_mass(self, mass: RandomizableFloat) -> None: ...
+    def set_mass(self, mass: RandomizableFloat) -> None:
+        # do assertion first
+        # self._env._assert_mutate()
+        ...
+
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
     def set_size(self, size: RandomizableVec3) -> None: ...
