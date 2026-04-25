@@ -185,3 +185,43 @@ class ParallelRunner:
 
     def __len__(self) -> int: ...
     def __getitem__(self, idx: int) -> Runner: ...
+
+class RuntimeState:
+    def __init__(self): 
+        """Runtime state returned by `runner.step(action)`
+        Remember that Simulac MUST NOT determine the end conditon of runner.
+        Finishing runner is reponsible for user and this way is more fitable with philosophy of the Simulac.
+        However, we should provide detailed information about running state to users to make them control end conditions.
+
+        Example:
+            # Expected usage pattern
+            for _ in range(300):
+                state = runner.step(action)
+                
+                # state SHOULD NOT contain information about `contact`
+                # contact info only returned when `state.contacts()` called
+                mug_on_table = state.contracts(
+                    mug.collider("bottom"),
+                    table.collider("top")
+                )
+                
+                # details
+                if mug_on_table:
+                    print(mug_on_table.exists)
+                    print(mug_on_table.count)
+                    print(mug_on_table.max_force)
+                    print(mug_on_table.points)
+                    print(mug_on_table.normal)
+                
+                # Don't get confused, drawer is NOT runtime object, MUST BE StuffObject
+                drawer_open = state.joint(drawer.joint("slide")).pos > 0.25
+                
+                runtime_drawer = runner.get_runtime_object(drawer)
+                # difference between `runtime_drawer` and state.joint(drawer.joint("slide")) is
+                # that `state.joint()` is readonly property, while `runtime_drawer` is mutable
+                assert state.joint(drawer.joint("slide")).pos == runtime_drawer.pos
+                
+                if mug_on_table and drawer_open:
+                    print("Happy! Happy! https://upload.wikimedia.org/wikipedia/commons/0/04/So_happy_smiling_cat.jpg")
+                    break
+        """
