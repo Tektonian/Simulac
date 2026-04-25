@@ -18,6 +18,7 @@ from .randomize import (
     RandomizableColor,
     RandomizableFloat,
     RandomizableVec3,
+    Vec3,
 )
 
 # Sentinal pattern: https://python-patterns.guide/python/sentinel-object/
@@ -357,7 +358,6 @@ class CameraObject:
 
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_lookat(self, lookat: RandomizableVec3) -> None: ...
     def set_fov(self, fov: RandomizableFloat) -> None: ...
     def set_aspect(self, aspect: RandomizableFloat) -> None: ...
     def set_near(self, near: RandomizableFloat) -> None: ...
@@ -368,6 +368,34 @@ class CameraObject:
         type: Literal[
             "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
         ],
+    ): ...
+
+    # Needed? @gangjeuk
+    def _set_resolution(self): ...
+    def _set_noise(self): ...
+    def _set_exposure(self, exposure: RandomizableFloat): ...
+
+    type AnchorRef = Any
+    type ColliderRef = Any
+    type LookAtTarget = Vec3 | AnchorRef | ColliderRef
+
+    def look_at(
+        self, target: LookAtTarget, *, up: Vec3, offset: RandomizableVec3
+    ) -> None: ...
+
+    def attach_to(
+        self,
+        parent: AnchorRef,
+        *,
+        offset: RandomizableVec3,
+        rot: RandomizableVec3,
+    ) -> None: ...
+    def follow(
+        self,
+        target: AnchorRef | ColliderRef | RobotObject[Any] | StuffObject,
+        *,
+        offset: RandomizableVec3,
+        frame: Literal["world", "local"],
     ): ...
 
 

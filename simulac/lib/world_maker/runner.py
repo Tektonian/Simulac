@@ -132,6 +132,10 @@ class CameraRuntime:
 
     def change_pos(self, pos: Vec3) -> None: ...
     def change_rot(self, rot: Vec3) -> None: ...
+    def change_fov(self, fov: float) -> None:
+        """for zoom mocking
+        Needed?
+        """
 
 
 class LightRuntime:
