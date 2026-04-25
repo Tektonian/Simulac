@@ -418,3 +418,28 @@ class LightObject:
         self, type: Literal["ambient", "pointlight", "reactarea", "spot"]
     ) -> None: ...
     def set_color(self, color: RandomizableColor) -> None: ...
+
+    def set_angle(self, angle: RandomizableFloat) -> None:
+        """spot only"""
+
+    def set_area_size(
+        self, width: RandomizableFloat, height: RandomizableFloat
+    ) -> None:
+        """area only"""
+
+    type AnchorRef = Any
+    type ColliderRef = Any
+    type LookAtTarget = Vec3 | AnchorRef | ColliderRef
+
+    # Below two are for headlight
+    def look_at(
+        self, target: LookAtTarget, *, up: Vec3, offset: RandomizableVec3
+    ) -> None: ...
+
+    def attach_to(
+        self,
+        parent: AnchorRef,
+        *,
+        offset: RandomizableVec3,
+        rot: RandomizableVec3,
+    ) -> None: ...
