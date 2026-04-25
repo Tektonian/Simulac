@@ -104,6 +104,8 @@ class Environment:
         description = description or ""
 
         if isinstance(entity, Stuff):
+            if entity_id is None:
+                entity_id = f"stuff_{len(self._env.stuffs)}"
             env_stuff_obj = self._world_maker.create_stuff_entity(
                 entity_id, description, entity.obj_uri_or_prebuilt_name, "", ""
             )
@@ -112,6 +114,8 @@ class Environment:
             )
             return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
+            if entity_id is None:
+                entity_id = f"robot_{len(self._env.machines)}"
             env_robot_obj = self._world_maker.create_machine_entity(
                 entity_id, description, entity.obj_uri_or_prebuilt_name
             )
@@ -123,6 +127,8 @@ class Environment:
                 RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
             )
         elif isinstance(entity, Camera):
+            if entity_id is None:
+                entity_id = f"camera_{len(self._env.machines)}"
             env_camera_obj = self._world_maker.create_camera_entity(
                 entity_id, description, entity.type
             )
@@ -131,6 +137,8 @@ class Environment:
             )
             return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Light):  # pyright: ignore[reportUnnecessaryIsInstance]
+            if entity_id is None:
+                entity_id = f"light_{len(self._env.lights)}"
             env_light_obj = self._world_maker.create_light_entity(
                 entity_id, description, entity.type
             )
