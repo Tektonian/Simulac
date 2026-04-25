@@ -58,7 +58,7 @@ class Environment:
     # NOTE: @gangjeuk
     # Should be `place()`?
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Stuff,
         pos: Tuple[float, float, float] = (0, 0, 0),
@@ -67,7 +67,7 @@ class Environment:
         description: str | None = None,
     ) -> StuffObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Camera,
         pos: Tuple[float, float, float] = (0, 0, 0),
@@ -76,7 +76,7 @@ class Environment:
         description: str | None = None,
     ) -> CameraObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
@@ -85,7 +85,7 @@ class Environment:
         description: str | None = None,
     ) -> LightObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Robot[ActionT],
         pos: Tuple[float, float, float] = (0, 0, 0),
@@ -93,7 +93,7 @@ class Environment:
         entity_id: str | None = None,
         description: str | None = None,
     ) -> RobotObject[ActionT]: ...
-    def place_entity(
+    def add_entity(
         self,
         entity: Stuff | Robot[ActionT] | Camera | Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
