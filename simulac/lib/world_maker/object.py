@@ -149,6 +149,29 @@ class Environment:
         else:
             raise NotImplementedError("Camera and light are not implemented")
 
+    type SurfaceRef = Any
+    type AnchorRef = Any
+    type CollideRef = Any
+    type PlaceType = SurfaceRef | AnchorRef | CollideRef
+
+    def place_object(
+        self,
+        obj: StuffObject | RobotObject[Any],
+        *,
+        on: PlaceType,
+        using: PlaceType | None,
+        margin: RandomizableFloat = 0.0,
+    ):
+        """
+        # When user want to place something on another thing
+        env.place(
+            mug,
+            on=table.collider("top")
+            using=mug.collider("bottom"),
+            margin=0.04
+        )
+        """
+
     @overload
     def remove_object(
         self,
@@ -259,13 +282,7 @@ class StuffObject:
 
             top.surface("up").sample(margin=0.04)      # Generate a target point on the table, offset by 4cm from all edges.
 
-            # When user want to place something on another thing
-            table.place(
-                mug,
-                on="top" # table collision mesh name
-                using=mug.collider("bottom").support((0, 0, -1), frame="local")
-                margin=0.04
-            )
+
         """
 
     type JointRef = Any
