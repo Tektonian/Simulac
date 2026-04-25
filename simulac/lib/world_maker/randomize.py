@@ -14,12 +14,15 @@ from typing_extensions import Required, TypeAlias
 
 ValueT = TypeVar("ValueT")
 
+# TODO: @gangjeuk
+# move type definition to somewhere else
 type Vec3 = tuple[float, float, float]
 type Quat = tuple[float, float, float, float]
 type ColorRgb = tuple[int, int, int]
 
 type SideType = Literal["above", "on", "below", "under"]
 type BetweenType = tuple[str, str]
+
 
 class NonpenetrationConstraintSpec(TypedDict):
     type: Literal["nonpenetration"]
@@ -152,15 +155,17 @@ class ChoiceRandomSpec(TypedDict, Generic[ValueT], total=False):
     values: Required[list[ValueT]]
     constraints: list[RandomConstraint]
 
+
 class EntryRandomSpec(TypedDict, Generic[ValueT], total=False):
-    type: Required[Literal['entry']]
+    type: Required[Literal["entry"]]
     path: Required[str]
+
 
 RandomSpec: TypeAlias = Union[
     UniformRandomSpec[ValueT],
     NormalRandomSpec[ValueT],
     ChoiceRandomSpec[ValueT],
-    EntryRandomSpec[ValueT]
+    EntryRandomSpec[ValueT],
 ]
 Randomizable: TypeAlias = Union[ValueT, RandomSpec[ValueT]]
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Generic, List, Literal, Tuple, cast, overload
 from typing import Any, Generic, Literal, Tuple, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
@@ -201,22 +200,22 @@ class StuffObject:
 
     type ColliderRef = Any
 
-    def collider(self, name: str) -> ColliderRef: ...
+    def collider(self, name: str) -> ColliderRef:
         """When user want to customize collision mesh.
         TODO: @gangjeuk
         write codes.
-        
+
         Example:
             # named collider reference
             # Asset author is responsible for the adequate name of collision mesh
             # Simulac will not support asset editing, edit mjcf, urdf, usd by yourself!
-            
+
             # named collider reference and set randomization
             table.collider("top").set_friction(Randomize.uniform(0.3, 1.5))
-            
+
             # geometry derived placement
             cube.set_pos(table.collider("top").surface("up").center)
-            
+
             # semantic author-defined reference
             # `.anchor` is specific location of an asset defined by an asset author
             # For example
@@ -233,17 +232,17 @@ class StuffObject:
             GLB nodes:
             - top
             - robot_mount
-            
+
             OBJ groups:
             g top
-            g robot_mount      
-            
+            g robot_mount
+
             # ColliderRef type example
-            
+
             table.anchor("place_area")      # semantic author-defined reference
-            
+
             top = table.collider("top")     # named collision shape
-            
+
             top.center      # collider volume center
             top.pose        # collider frame pos
             top.bounds      # world-space bounds (AABB/OBB-ish)
@@ -251,14 +250,14 @@ class StuffObject:
             top.bounds.max
             top.bounds.min
             top.bounds.size
-            
+
             top.surface("up").center    # center of contact surface
             top.surface("up").normal    # normal vector of contact surface
             top.support((0, 0, 1), frame="world")  # outer contact feature toward world +Z
             top.support((0, 0, 1), frame="local")  # outer contact feature toward local +Z
-            
+
             top.surface("up").sample(margin=0.04)      # Generate a target point on the table, offset by 4cm from all edges.
-            
+
             # When user want to place something on another thing
             table.place(
                 mug,
@@ -267,34 +266,35 @@ class StuffObject:
                 margin=0.04
             )
         """
-    
+
     type JointRef = Any
+
     def joint(self, name: str) -> JointRef:
         """When user want to control joint
         TODO: @gangjeuk
         implement code (TOO many TODOs)
 
         # Same as collision mesh control, we do not provide asset editing
-        
+
         # named joint reference
         slide = drawer.joint("slide")
-        
+
         # build-time initial state
         slide.set_pos(Randomize.uniform(0.0, 0.15))
-        
+
         # optional joint-level randomization
         slide.set_friction(Randomize.uniform(0.1, 0.5))
         slide.set_damping(Randomize.uniform(0.02, 0.2))
-        
+
         # get articulated state
         pull_pose = drawer.anchor("handle_grasp").pose
-        
+
         # exposed readonly properties
         joint.pose
         joint.axis
         joint.limit
         joint.type
-        
+
         """
 
     def set_mass(self, mass: RandomizableFloat) -> None:
