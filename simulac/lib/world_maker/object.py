@@ -297,6 +297,10 @@ class StuffObject:
 
         """
 
+    type AnchorRef = Any
+
+    def anchor(self, name: str) -> AnchorRef: ...
+
     def set_mass(self, mass: RandomizableFloat) -> None:
         # do assertion first
         # self._env._assert_mutate()
@@ -329,6 +333,14 @@ class RobotObject(Generic[ActionT]):
 
     def get_joint_min(self) -> ActionT: ...
     def get_joint_max(self) -> ActionT: ...
+
+    """
+    See comments on `StuffObject`
+    """
+
+    def joint(self, name: str): ...
+    def collider(self, name: str): ...
+    def anchor(self, name: str): ...
 
 
 class CameraObject:
