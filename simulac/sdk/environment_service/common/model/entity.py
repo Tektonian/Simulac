@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional, Tuple
-from uuid import uuid4
+from typing import TYPE_CHECKING, Literal, Tuple
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.model.component import (
@@ -16,7 +14,6 @@ if TYPE_CHECKING:
 class EnvironmentCameraEntity:
     def __init__(
         self,
-        id: str | None,
         name: str,
         description: str,
         type: Literal[
@@ -31,7 +28,6 @@ class EnvironmentCameraEntity:
         near: float = 100.0,
         far: float = 1000.0,
     ) -> None:
-        self.id = id
         self.name = name
         self.description = description
         self.type = type
@@ -48,8 +44,7 @@ class EnvironmentCameraEntity:
 class EnvironmentMachineEntity:
     def __init__(
         self,
-        id: str | None,
-        name: str,
+        id: str,
         description: str,
         uri: str,
         pos: Tuple[float, float, float] = (0, 0, 0),
@@ -71,8 +66,7 @@ class EnvironmentMachineEntity:
 class EnvironmentLightEntity:
     def __init__(
         self,
-        id: str | None,
-        name: str,
+        id: str,
         description: str,
         type: Literal["ambient", "pointlight", "reactarea", "spot"],
         color: Tuple[int, int, int],
@@ -81,7 +75,6 @@ class EnvironmentLightEntity:
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
     ) -> None:
         self.id = id
-        self.name = name
         self.description = description
         self.type = type
         self.color = color
@@ -93,8 +86,7 @@ class EnvironmentLightEntity:
 class EnvironmentStuffEntity:
     def __init__(
         self,
-        id: str | None,
-        name: str,
+        id: str,
         description: str,
         rendering: RenderingComponent,
         physics: MJCFPhysicsComponent | URDFPhysicsComponent | USDPhysicsComponent,
@@ -104,7 +96,6 @@ class EnvironmentStuffEntity:
         fixed: bool = True,
     ) -> None:
         self.id = id
-        self.name = name
         self.description = description
         self.physics = physics
         self.rendering = rendering

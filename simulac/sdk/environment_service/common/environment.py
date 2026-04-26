@@ -35,7 +35,7 @@ class IEnvironment(ABC):
 
     benchmark_specific_args: dict[str, Any]
 
-    objects: list[EnvironmentStuffEntity] = field(default_factory=list)
+    stuffs: list[EnvironmentStuffEntity] = field(default_factory=list)
     cameras: list[EnvironmentCameraEntity] = field(default_factory=list)
     lights: list[EnvironmentLightEntity] = field(default_factory=list)
     machines: list[EnvironmentMachineEntity] = field(default_factory=list)

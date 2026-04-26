@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Generic, List, Literal, Tuple, cast, overload
+from typing import Any, Generic, Literal, Tuple, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
@@ -58,62 +58,66 @@ class Environment:
     # NOTE: @gangjeuk
     # Should be `place()`?
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Stuff,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        name: str = "",
+        entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Camera,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        name: str = "",
+        entity_id: str | None = None,
         description: str | None = None,
     ) -> CameraObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        name: str = "",
+        entity_id: str | None = None,
         description: str | None = None,
     ) -> LightObject: ...
     @overload
-    def place_entity(
+    def add_entity(
         self,
         entity: Robot[ActionT],
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        name: str = "",
+        entity_id: str | None = None,
         description: str | None = None,
     ) -> RobotObject[ActionT]: ...
-    def place_entity(
+    def add_entity(
         self,
         entity: Stuff | Robot[ActionT] | Camera | Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        name: str | None = None,
+        entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
         description = description or ""
-        name = name or ""  # TODO: @gangjeuk / rename based on object_url if it is None
+
         if isinstance(entity, Stuff):
+            if entity_id is None:
+                entity_id = f"stuff_{len(self._env.stuffs)}"
             env_stuff_obj = self._world_maker.create_stuff_entity(
-                name, description, entity.obj_uri_or_prebuilt_name, "", ""
+                entity_id, description, entity.obj_uri_or_prebuilt_name, "", ""
             )
             self._world_maker.add_entity(
                 self._env.id, env_stuff_obj, pos=pos, quat=quat
             )
             return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
+            if entity_id is None:
+                entity_id = f"robot_{len(self._env.machines)}"
             env_robot_obj = self._world_maker.create_machine_entity(
-                name, description, entity.obj_uri_or_prebuilt_name
+                entity_id, description, entity.obj_uri_or_prebuilt_name
             )
             self._world_maker.add_entity(
                 self._env.id, env_robot_obj, pos=pos, quat=quat
@@ -123,16 +127,20 @@ class Environment:
                 RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
             )
         elif isinstance(entity, Camera):
+            if entity_id is None:
+                entity_id = f"camera_{len(self._env.machines)}"
             env_camera_obj = self._world_maker.create_camera_entity(
-                name, description, entity.type
+                entity_id, description, entity.type
             )
             self._world_maker.add_entity(
                 self._env.id, env_camera_obj, pos=pos, quat=quat
             )
             return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Light):  # pyright: ignore[reportUnnecessaryIsInstance]
+            if entity_id is None:
+                entity_id = f"light_{len(self._env.lights)}"
             env_light_obj = self._world_maker.create_light_entity(
-                name, description, entity.type
+                entity_id, description, entity.type
             )
             self._world_maker.add_entity(
                 self._env.id, env_light_obj, pos=pos, quat=quat
@@ -140,6 +148,29 @@ class Environment:
             return LightObject(env_light_obj, _create_sentinal=_CREATE_SENTINAL)
         else:
             raise NotImplementedError("Camera and light are not implemented")
+
+    type SurfaceRef = Any
+    type AnchorRef = Any
+    type CollideRef = Any
+    type PlaceType = SurfaceRef | AnchorRef | CollideRef
+
+    def place_object(
+        self,
+        obj: StuffObject | RobotObject[Any],
+        *,
+        on: PlaceType,
+        using: PlaceType | None,
+        margin: RandomizableFloat = 0.0,
+    ):
+        """
+        # When user want to place something on another thing
+        env.place(
+            mug,
+            on=table.collider("top")
+            using=mug.collider("bottom"),
+            margin=0.04
+        )
+        """
 
     @overload
     def remove_object(
@@ -191,6 +222,103 @@ class StuffObject:
 
         self._entity = entity
 
+    type ColliderRef = Any
+
+    def collider(self, name: str) -> ColliderRef:
+        """When user want to customize collision mesh.
+        TODO: @gangjeuk
+        write codes.
+
+        Example:
+            # named collider reference
+            # Asset author is responsible for the adequate name of collision mesh
+            # Simulac will not support asset editing, edit mjcf, urdf, usd by yourself!
+
+            # named collider reference and set randomization
+            table.collider("top").set_friction(Randomize.uniform(0.3, 1.5))
+
+            # geometry derived placement
+            cube.set_pos(table.collider("top").surface("up").center)
+
+            # semantic author-defined reference
+            # `.anchor` is specific location of an asset defined by an asset author
+            # For example
+            #   <!--MJCF-->
+            #   <body name="table">
+            #       <geom name="top" type="box" pos="0 0 0.75" size="0.6 0.4 0.03" />
+            #       <site name="workspace_center" pos="0 0 0.79" />
+            #       <site name="robot_mount" pos="-0.45 0 0.78" />
+            #   </body>
+            robot.set_pos(table.anchor("workspace_center").pos)
+
+            # In case of normal 3d asset like .obj and .glb
+            # Each node name should be the name of collision mesh
+            GLB nodes:
+            - top
+            - robot_mount
+
+            OBJ groups:
+            g top
+            g robot_mount
+
+            # ColliderRef type example
+
+            table.anchor("place_area")      # semantic author-defined reference
+
+            top = table.collider("top")     # named collision shape
+
+            top.center      # collider volume center
+            top.pose        # collider frame pos
+            top.bounds      # world-space bounds (AABB/OBB-ish)
+            top.bounds.center
+            top.bounds.max
+            top.bounds.min
+            top.bounds.size
+
+            top.surface("up").center    # center of contact surface
+            top.surface("up").normal    # normal vector of contact surface
+            top.support((0, 0, 1), frame="world")  # outer contact feature toward world +Z
+            top.support((0, 0, 1), frame="local")  # outer contact feature toward local +Z
+
+            top.surface("up").sample(margin=0.04)      # Generate a target point on the table, offset by 4cm from all edges.
+
+
+        """
+
+    type JointRef = Any
+
+    def joint(self, name: str) -> JointRef:
+        """When user want to control joint
+        TODO: @gangjeuk
+        implement code (TOO many TODOs)
+
+        # Same as collision mesh control, we do not provide asset editing
+
+        # named joint reference
+        slide = drawer.joint("slide")
+
+        # build-time initial state
+        slide.set_pos(Randomize.uniform(0.0, 0.15))
+
+        # optional joint-level randomization
+        slide.set_friction(Randomize.uniform(0.1, 0.5))
+        slide.set_damping(Randomize.uniform(0.02, 0.2))
+
+        # get articulated state
+        pull_pose = drawer.anchor("handle_grasp").pose
+
+        # exposed readonly properties
+        joint.pose
+        joint.axis
+        joint.limit
+        joint.type
+
+        """
+
+    type AnchorRef = Any
+
+    def anchor(self, name: str) -> AnchorRef: ...
+
     def set_mass(self, mass: RandomizableFloat) -> None:
         # do assertion first
         # self._env._assert_mutate()
@@ -219,10 +347,18 @@ class RobotObject(Generic[ActionT]):
 
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_act_pos(self, pos: Randomizable[ActionT]) -> None: ...
+    def set_joint_pos(self, pos: Randomizable[ActionT]) -> None: ...
 
-    def get_act_min(self) -> ActionT: ...
-    def get_act_max(self) -> ActionT: ...
+    def get_joint_min(self) -> ActionT: ...
+    def get_joint_max(self) -> ActionT: ...
+
+    """
+    See comments on `StuffObject`
+    """
+
+    def joint(self, name: str): ...
+    def collider(self, name: str): ...
+    def anchor(self, name: str): ...
 
 
 class CameraObject:
@@ -239,7 +375,6 @@ class CameraObject:
 
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_lookat(self, lookat: RandomizableVec3) -> None: ...
     def set_fov(self, fov: RandomizableFloat) -> None: ...
     def set_aspect(self, aspect: RandomizableFloat) -> None: ...
     def set_near(self, near: RandomizableFloat) -> None: ...
@@ -250,6 +385,34 @@ class CameraObject:
         type: Literal[
             "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
         ],
+    ): ...
+
+    # Needed? @gangjeuk
+    def _set_resolution(self): ...
+    def _set_noise(self): ...
+    def _set_exposure(self, exposure: RandomizableFloat): ...
+
+    type AnchorRef = Any
+    type ColliderRef = Any
+    type LookAtTarget = Vec3 | AnchorRef | ColliderRef
+
+    def look_at(
+        self, target: LookAtTarget, *, up: Vec3, offset: RandomizableVec3
+    ) -> None: ...
+
+    def attach_to(
+        self,
+        parent: AnchorRef,
+        *,
+        offset: RandomizableVec3,
+        rot: RandomizableVec3,
+    ) -> None: ...
+    def follow(
+        self,
+        target: AnchorRef | ColliderRef | RobotObject[Any] | StuffObject,
+        *,
+        offset: RandomizableVec3,
+        frame: Literal["world", "local"],
     ): ...
 
 
@@ -273,169 +436,27 @@ class LightObject:
     ) -> None: ...
     def set_color(self, color: RandomizableColor) -> None: ...
 
+    def set_angle(self, angle: RandomizableFloat) -> None:
+        """spot only"""
 
-class Runner:
-    def __init__(
-        self,
-        env: Environment,
-        seed: int | None = 0,
-        tick: int | None = 5,  # 5ms
-        record_location: str
-        | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
-        /,
-        *,
-        runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
-    ):
-        self.seed = seed
-        self.tick_time = tick
-
-        self._world_maker = obtain_runtime().world_maker
-
-        self._runner = self._world_maker.create_runner(env._env.id)
-
-        env._freeze()
-
-    def step(self, action: List[float]):
-        self._runner.step(action)
-
-    def tick(self): ...
-
-    type State = Any
-
-    def reset(self) -> State: ...
-
-    def get_state(self): ...
-
-    @overload
-    def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
-    @overload
-    def get_runtime_object(
-        self, obj: RobotObject[ActionT]
-    ) -> RobotRuntime[ActionT]: ...
-    @overload
-    def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
-    @overload
-    def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
-    def get_runtime_object(
-        self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
-    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime: ...
-
-    def close(self) -> None: ...
-
-    # For context manage
-    # e.g., `with Runner(env) as runner:`
-    def __enter__(self): ...
-    def __exit__(self, exc_type, exc, tb): ...
-
-    def _debug_render(self):
-        return self._runner._debug_render()
-
-
-class StuffRuntime:
-    def __init__(
-        self,
-        /,
-        *,
-        _create_sentinal: object,
+    def set_area_size(
+        self, width: RandomizableFloat, height: RandomizableFloat
     ) -> None:
-        if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+        """area only"""
 
-    def change_mass(self, mass: float) -> None: ...
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_size(self, size: Vec3) -> None: ...
-    def change_fixed(self, is_fixed: bool) -> None: ...
-    def change_friction(self, friction: float) -> None: ...
-    def change_density(self, density: float) -> None: ...
+    type AnchorRef = Any
+    type ColliderRef = Any
+    type LookAtTarget = Vec3 | AnchorRef | ColliderRef
 
-
-class RobotRuntime(Generic[ActionT]):
-    def __init__(
-        self,
-        /,
-        *,
-        _create_sentinal: object,
-    ) -> None:
-        if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
-
-    def step(self, action: ActionT) -> None: ...
-    def tick(self) -> None: ...
-
-    def get_pos(self) -> Vec3: ...
-    def get_vel(self) -> list[float]: ...
-
-
-class CameraRuntime:
-    def __init__(
-        self,
-        /,
-        *,
-        _create_sentinal: object,
-    ) -> None:
-        if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
-
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_rot(self, rot: Vec3) -> None: ...
-
-
-class LightRuntime:
-    def __init__(
-        self,
-        /,
-        *,
-        _create_sentinal: object,
-    ) -> None:
-        if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
-
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_rot(self, rot: Vec3) -> None: ...
-    def change_intensity(self, intensity: float) -> None: ...
-    def change_color(self, color: tuple[int, int, int]) -> None: ...
-
-    # Needed?
-    def __change_type(self): ...
-
-
-# region Will be implemented
-
-
-class ParallelRunner:
-    def __init__(
-        self,
-        envs: list[Environment],
-        seeds: list[int] | None = None,
-        tick: list[int] | None = None,
-        record_locations: list[str] | None = None,
-        strict: bool = True,
+    # Below two are for headlight
+    def look_at(
+        self, target: LookAtTarget, *, up: Vec3, offset: RandomizableVec3
     ) -> None: ...
 
-    def step(self, actions: list[list[float]]) -> None: ...
-    def tick(self) -> None: ...
-
-    type State = Any
-
-    def reset(self, seeds: list[int]) -> list[State]: ...
-
-    def close(self) -> None: ...
-
-    # For context manage
-    # e.g., `with Runner(env) as runner:`
-    def __enter__(self): ...
-    def __exit__(self, exc_type, exc, tb): ...
-
-    def at(self, idx: int) -> Runner: ...
-
-    def get_state(self) -> object: ...
-
-    def __len__(self) -> int: ...
-    def __getitem__(self, idx: int) -> Runner: ...
-
-
-class __BIV:
-    """Brain in a vat? or Agent?"""
-
-
-# end-region
+    def attach_to(
+        self,
+        parent: AnchorRef,
+        *,
+        offset: RandomizableVec3,
+        rot: RandomizableVec3,
+    ) -> None: ...

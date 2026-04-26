@@ -99,7 +99,7 @@ class EnvironmentManagementService(IEnvironmentManagementService):
 
         env = env_ret[0]
 
-        env.objects.append(entity)
+        env.stuffs.append(entity)
 
 
 class Environment(IEnvironment):
@@ -118,7 +118,7 @@ class Environment(IEnvironment):
 
         self.physics_engine = default_engine
 
-        self.objects = []
+        self.stuffs = []
 
     def load_env(self): ...
 
