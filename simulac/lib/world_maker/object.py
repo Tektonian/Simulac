@@ -62,7 +62,7 @@ class Environment:
         self,
         entity: Stuff,
         pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject: ...
@@ -71,7 +71,7 @@ class Environment:
         self,
         entity: Camera,
         pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> CameraObject: ...
@@ -80,7 +80,7 @@ class Environment:
         self,
         entity: Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> LightObject: ...
@@ -89,7 +89,7 @@ class Environment:
         self,
         entity: Robot[ActionT],
         pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> RobotObject[ActionT]: ...
@@ -97,7 +97,7 @@ class Environment:
         self,
         entity: Stuff | Robot[ActionT] | Camera | Light,
         pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
