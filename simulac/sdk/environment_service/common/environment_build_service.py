@@ -147,6 +147,9 @@ class EnvironmentBuildService(IEnvironmentBuildService):
                 )
             )
         entity.id = new_entity_id
+        entity.pos = pos
+        # TODO: @gangjeuk
+        # entity.quat = rot (?)
 
         self.__append_entity_to_env(env, entity)
         env_entities.append(entity)
