@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class EnvironmentMachineEntity:
-    id: str
+    id: str | None = None
     description: str = ""
     pos: RandomizableVec3 = (0, 0, 0)
     quat: RandomizableQuat = (0, 0, 0, 1)
@@ -34,7 +34,7 @@ class EnvironmentMachineEntity:
 
 @dataclass(slots=True)
 class EnvironmentStuffEntity:
-    id: str
+    id: str | None = None
     description: str = ""
     asset_uri: list[str] = []
     pos: RandomizableVec3 = (0, 0, 0)
@@ -142,7 +142,7 @@ type LightSpec = AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSp
 
 @dataclass(slots=True)
 class EnvironmentLightEntity:
-    id: str
+    id: str | None = None
     description: str = ""
     pos: RandomizableVec3 = (0, 0, 0)
     quat: RandomizableQuat = (0, 0, 0, 1)
@@ -172,7 +172,7 @@ class CameraSpec:
 
 @dataclass(slots=True)
 class EnvironmentCameraEntity:
-    id: str
+    id: str | None = None
     description: str = ""
     spec: CameraSpec = field(default_factory=CameraSpec)
     pos: RandomizableVec3 = (0, 0, 0)
