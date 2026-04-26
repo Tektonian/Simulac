@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class EnvironmentCameraEntity:
     def __init__(
         self,
-        name: str,
+        id: str,
         description: str,
         type: Literal[
             "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
@@ -28,7 +28,7 @@ class EnvironmentCameraEntity:
         near: float = 100.0,
         far: float = 1000.0,
     ) -> None:
-        self.name = name
+        self.id = id
         self.description = description
         self.type = type
         self.mode = mode
@@ -51,7 +51,6 @@ class EnvironmentMachineEntity:
         quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
     ) -> None:
         self.id = id
-        self.name = name
         self.description = description
         self.uri = uri
         self.pos = pos
