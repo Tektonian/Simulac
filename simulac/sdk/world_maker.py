@@ -65,7 +65,8 @@ class WorldMakerFacade:
 
     def create_stuff_entity(
         self,
-        name: str,
+        id: str,
+        description: str,
         physics_uri_or_prebuilt_name: str,
     ) -> EnvironmentStuffEntity:
         """_summary_
@@ -88,7 +89,8 @@ class WorldMakerFacade:
 
     def create_machine_entity(
         self,
-        name: str,
+        id: str,
+        description: str,
         physics_uri_or_prebuilt_name: str,
     ) -> EnvironmentMachineEntity:
         """_summary_
@@ -109,7 +111,8 @@ class WorldMakerFacade:
 
     def create_camera_entity(
         self,
-        name: str,
+        id: str,
+        description: str,
         type: Literal[
             "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
         ] = "rgb",
@@ -119,7 +122,8 @@ class WorldMakerFacade:
 
     def create_light_entity(
         self,
-        name: str,
+        id: str,
+        description: str,
         type: Literal["ambient", "pointlight", "reactarea", "spot"],
     ):
         entity = EnvironmentLightEntity(None, name, "", type, (0xFF, 0xFF, 0xFF))
