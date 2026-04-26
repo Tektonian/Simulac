@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Sequence, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, Sequence, Union
+
+from typing_extensions import TypeVar
 
 from simulac.sdk.environment_service.common.model.entity import (
     AmbientLightSpec,

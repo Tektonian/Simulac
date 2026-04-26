@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Generic, Literal, overload
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.base.types.geometry import Vec3
 from simulac.sdk import obtain_runtime
 
 from .entity import ActionT
 from .object import _CREATE_SENTINAL, Environment
-from .randomize import Vec3
 
 if TYPE_CHECKING:
     from .object import CameraObject, LightObject, RobotObject, StuffObject
