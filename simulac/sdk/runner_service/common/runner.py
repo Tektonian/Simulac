@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -23,7 +25,7 @@ class IRunner(ABC):
     def tick(self) -> None: ...
 
     @abstractmethod
-    def reset(self) -> None: ...
+    def reset(self, seed: int | None = 0) -> None: ...
 
     @abstractmethod
     def set_state(self) -> None:

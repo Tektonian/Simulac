@@ -90,7 +90,7 @@ class MujocoRunner(IRunner):
         self.on_after_call_step(self.runner_id)
 
     def tick(self) -> None:
-        mujoco.mj_step(self.mj_model, self._data)
+        mujoco.mj_step(self.mj_model, self._require_data())
 
     # FIXME: debug purpose for now. Should return state info mapped with self._env
     def get_state(self) -> None:
@@ -104,6 +104,7 @@ class MujocoRunner(IRunner):
     def reset(self) -> None:
         if self._data is not None:
             mujoco.mj_resetData(self.mj_model, self._data)
+    def reset(self, seed: int | None = 0) -> None:
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)

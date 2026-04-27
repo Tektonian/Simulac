@@ -38,12 +38,13 @@ class Runner:
     def step(self, action: list[float]):
         self._runner.step(action)
 
-    def tick(self): ...
+    def tick(self):
+        self._runner.tick()
 
     type State = Any
 
-    def reset(self) -> State:
-        self._runner.reset()
+    def reset(self, seed: int | None = 0) -> State:
+        self._runner.reset(seed)
 
     def get_state(self): ...
 
