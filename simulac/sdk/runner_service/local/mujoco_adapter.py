@@ -101,7 +101,9 @@ class MujocoRunner(IRunner):
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
     def render(self) -> None: ...
-    def reset(self) -> None: ...
+    def reset(self) -> None:
+        if self._data is not None:
+            mujoco.mj_resetData(self.mj_model, self._data)
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)
@@ -145,20 +147,22 @@ class MujocoAdapter(IPhysicsEngineAdapter):
 
         env = env_ret[0]
 
-        objects = env.objects
+        stuffs = env.stuffs
 
-        for obj in objects:
+        for stuff in stuffs:
             # TODO: URDF file is not handled here. Need handling code
-            child = mujoco.MjSpec.from_file(obj.physics.mjcf_uri)
+            child = mujoco.MjSpec.from_file(stuff.asset_uri)
 
             child_bodies: list[mujoco.MjsBody] = child.bodies
             # change pos
             for body in child_bodies:
                 if body.parent == child.worldbody:
-                    body.pos = list(obj.pos)
-                    body.quat = list(obj.quat)
+                    body.pos = list(stuff.pos)
+                    body.quat = list(stuff.quat)
 
-            self.root_spec.attach(child, frame=self.root_frame, prefix=obj.id)
+            self.root_spec.attach(
+                child, frame=self.root_frame, prefix=stuff.id, suffix=""
+            )
         """
         TODO: 
             1. implement mujoco parallel

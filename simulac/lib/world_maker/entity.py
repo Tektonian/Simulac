@@ -1,10 +1,25 @@
 from __future__ import annotations
 
-from typing import Generic, Literal, Sequence, TypeVar, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Generic, Sequence, TypeVar, Union
 
-from typing_extensions import TypeVar
+from simulac.sdk.environment_service.common.model.entity import (
+    AmbientLightSpec,
+    AreaLightSpec,
+    CameraMode,
+    CameraSpec,
+    CameraType,
+    LightSpec,
+    PointLightSpec,
+    SpotLightSpec,
+)
 
-from .randomize import RandomizableFloat, RandomizableVec3
+if TYPE_CHECKING:
+    from simulac.sdk.environment_service.common.randomize import (
+        RandomizableColor,
+        RandomizableFloat,
+        RandomizableVec3,
+    )
 
 ActionT = TypeVar("ActionT", bound=Sequence[float], default=list[float])
 
@@ -22,32 +37,78 @@ class Robot(Generic[ActionT]):
 class Camera:
     def __init__(
         self,
-        type: Literal[
-            "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
-        ] = "rgb",
-        mode: Literal["fixed", "track"] = "track",
+        type: CameraType = "rgb",
+        mode: CameraMode = "fixed",
         lookat: Union[RandomizableVec3, tuple[float, float, float]] = (0, 0, 0),
         fov: Union[RandomizableFloat, float] = 50.0,
         aspect: Union[RandomizableFloat, float] = 1.0,
         near: Union[RandomizableFloat, float] = 100.0,
         far: Union[RandomizableFloat, float] = 1000.0,
     ):
-        self.type = type
-        self.mode = mode
-        self.lookat = lookat
-        self.fov = fov
-        self.aspect = aspect
-        self.near = near
-        self.far = far
+        self.__spec = CameraSpec(type, mode, lookat, fov, aspect, near, far)
+
+    def _to_spec(self) -> CameraSpec:
+        return self.__spec
 
 
-class Light:
-    def __init__(
-        self,
-        type: Literal["ambient", "pointlight", "reactarea", "spot"] = "spot",
-        color: Union[RandomizableVec3, tuple[int, int, int]] = (0xFF, 0xFF, 0xFF),
-        intensity: Union[RandomizableFloat, float] = 0.8,
-    ):
-        self.type = type
-        self.color = color
-        self.intensity = intensity
+@dataclass(frozen=True, slots=True)
+class _Light:
+    color: RandomizableColor = (255, 255, 255)
+    intensity: RandomizableFloat = 0.8
+
+    def _to_spec(self) -> LightSpec:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class SpotLight(_Light):
+    angle: RandomizableFloat = 45.0
+    penumbra: RandomizableFloat = 0.0
+
+    def _to_spec(self) -> SpotLightSpec:
+        return SpotLightSpec(
+            color=self.color,
+            intensity=self.intensity,
+            angle=self.angle,
+            penumbra=self.penumbra,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AreaLight(_Light):
+    width: RandomizableFloat = 1.0
+    height: RandomizableFloat = 1.0
+
+    def _to_spec(self) -> AreaLightSpec:
+        return AreaLightSpec(
+            color=self.color,
+            intensity=self.intensity,
+            width=self.width,
+            height=self.height,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AmbientLight(_Light):
+    def _to_spec(self) -> AmbientLightSpec:
+        return AmbientLightSpec(
+            color=self.color,
+            intensity=self.intensity,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PointLight(_Light):
+    range: RandomizableFloat | None = None
+    decay: RandomizableFloat = 2.0
+
+    def _to_spec(self) -> PointLightSpec:
+        return PointLightSpec(
+            color=self.color,
+            intensity=self.intensity,
+            range=self.range,
+            decay=self.decay,
+        )
+
+
+type LightType = SpotLight | AreaLight | AmbientLight | PointLight

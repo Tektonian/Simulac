@@ -70,7 +70,6 @@ class EnvironmentManagementService(IEnvironmentManagementService):
     def create_environment(
         self, engine: Literal["mujoco", "newton", "genesis"] = "mujoco"
     ) -> ResultType[IEnvironment, BaseException]:
-
         env_id = f"{self._ID_PREFIX}{len(self._environments)}"
 
         world_ret = self.WorldManagementService.create_world(None)
@@ -119,6 +118,9 @@ class Environment(IEnvironment):
         self.physics_engine = default_engine
 
         self.stuffs = []
+        self.cameras = []
+        self.lights = []
+        self.machines = []
 
     def load_env(self): ...
 
