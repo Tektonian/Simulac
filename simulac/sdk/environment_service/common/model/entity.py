@@ -5,10 +5,7 @@ from typing import TYPE_CHECKING, Literal, Tuple
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.model.component import (
-        MJCFPhysicsComponent,
         RenderingComponent,
-        URDFPhysicsComponent,
-        USDPhysicsComponent,
     )
     from simulac.sdk.environment_service.common.model.ref import BuildOpType
     from simulac.sdk.environment_service.common.randomize import (
@@ -25,6 +22,7 @@ if TYPE_CHECKING:
 class EnvironmentMachineEntity:
     id: str | None = None
     description: str = ""
+    asset_uri: str | None = None
     pos: RandomizableVec3 = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
 
@@ -39,7 +37,7 @@ class EnvironmentMachineEntity:
 class EnvironmentStuffEntity:
     id: str | None = None
     description: str = ""
-    asset_uri: list[str] = []
+    asset_uri: str | None = None
     pos: RandomizableVec3 = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
     size: RandomizableVec3 = (1, 1, 1)

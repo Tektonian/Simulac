@@ -9,12 +9,6 @@ from simulac.sdk.environment_service.common.environment_build_service import (
 from simulac.sdk.environment_service.common.environment_service import (
     IEnvironmentManagementService,
 )
-from simulac.sdk.environment_service.common.model.component import (
-    MJCFPhysicsComponent,
-    RenderingComponent,
-    URDFPhysicsComponent,
-    USDPhysicsComponent,
-)
 from simulac.sdk.environment_service.common.model.entity import (
     EnvironmentCameraEntity,
     EnvironmentLightEntity,
@@ -43,9 +37,6 @@ if TYPE_CHECKING:
         | EnvironmentMachineEntity
         | EnvironmentCameraEntity
         | EnvironmentLightEntity
-    )
-    type PhysicsComponent = (
-        MJCFPhysicsComponent | USDPhysicsComponent | URDFPhysicsComponent
     )
 
 

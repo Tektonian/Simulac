@@ -8,11 +8,6 @@ from urllib.parse import SplitResult, urlsplit
 from simulac.base.error.error import SimulacBaseError
 from simulac.base.instantiate.instantiate import ServiceIdentifier, service_identifier
 from simulac.base.result.result import ResultType
-from simulac.sdk.environment_service.common.model.component import (
-    MJCFPhysicsComponent,
-    URDFPhysicsComponent,
-    USDPhysicsComponent,
-)
 from simulac.sdk.log_service.common.log_service import ILogService
 from simulac.sdk.world_service.common.world_service import IWorldManagementService
 
