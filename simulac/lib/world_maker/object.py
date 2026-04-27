@@ -1,26 +1,39 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Literal, Tuple, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
-from simulac.sdk.environment_service.common.model.entity import (
-    EnvironmentCameraEntity,
-    EnvironmentLightEntity,
-    EnvironmentMachineEntity,
-    EnvironmentStuffEntity,
+
+if TYPE_CHECKING:
+    from simulac.sdk.environment_service.common.model.entity import (
+        EnvironmentCameraEntity,
+        EnvironmentLightEntity,
+        EnvironmentMachineEntity,
+        EnvironmentStuffEntity,
+    )
+    from simulac.sdk.environment_service.common.randomize import (
+        Randomizable,
+        RandomizableBool,
+        RandomizableColor,
+        RandomizableFloat,
+        RandomizableVec3,
+        Vec3,
+    )
+
+from .entity import (
+    ActionT,
+    AmbientLight,
+    AreaLight,
+    Camera,
+    PointLight,
+    Robot,
+    SpotLight,
+    Stuff,
 )
 
-from .entity import ActionT, Camera, Light, Robot, Stuff
-from .randomize import (
-    Randomizable,
-    RandomizableBool,
-    RandomizableColor,
-    RandomizableFloat,
-    RandomizableVec3,
-    Vec3,
-)
-
+if TYPE_CHECKING:
+    from .entity import LightType
 # Sentinal pattern: https://python-patterns.guide/python/sentinel-object/
 _CREATE_SENTINAL = object()
 
@@ -61,8 +74,8 @@ class Environment:
     def add_entity(
         self,
         entity: Stuff,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject: ...
@@ -70,17 +83,17 @@ class Environment:
     def add_entity(
         self,
         entity: Camera,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> CameraObject: ...
     @overload
     def add_entity(
         self,
-        entity: Light,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        entity: LightType,
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> LightObject: ...
@@ -88,66 +101,59 @@ class Environment:
     def add_entity(
         self,
         entity: Robot[ActionT],
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> RobotObject[ActionT]: ...
     def add_entity(
         self,
-        entity: Stuff | Robot[ActionT] | Camera | Light,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
+        entity: Stuff | Robot[ActionT] | Camera | LightType,
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
         description = description or ""
 
         if isinstance(entity, Stuff):
-            if entity_id is None:
-                entity_id = f"stuff_{len(self._env.stuffs)}"
             env_stuff_obj = self._world_maker.create_stuff_entity(
-                entity_id, description, entity.obj_uri_or_prebuilt_name, "", ""
+                entity.obj_uri_or_prebuilt_name, description=description
             )
             self._world_maker.add_entity(
-                self._env.id, env_stuff_obj, pos=pos, quat=quat
+                self._env.id, env_stuff_obj, entity_id, pos=pos, rot=rot
             )
             return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
         elif isinstance(entity, Robot):
-            if entity_id is None:
-                entity_id = f"robot_{len(self._env.machines)}"
             env_robot_obj = self._world_maker.create_machine_entity(
-                entity_id, description, entity.obj_uri_or_prebuilt_name
+                entity.obj_uri_or_prebuilt_name, description=description
             )
             self._world_maker.add_entity(
-                self._env.id, env_robot_obj, pos=pos, quat=quat
+                self._env.id, env_robot_obj, entity_id, pos=pos, rot=rot
             )
             return cast(
                 "RobotObject[ActionT]",
                 RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
             )
         elif isinstance(entity, Camera):
-            if entity_id is None:
-                entity_id = f"camera_{len(self._env.machines)}"
             env_camera_obj = self._world_maker.create_camera_entity(
-                entity_id, description, entity.type
+                entity._to_spec(), description=description
             )
             self._world_maker.add_entity(
-                self._env.id, env_camera_obj, pos=pos, quat=quat
+                self._env.id, env_camera_obj, entity_id, pos=pos, rot=rot
             )
             return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
-        elif isinstance(entity, Light):  # pyright: ignore[reportUnnecessaryIsInstance]
-            if entity_id is None:
-                entity_id = f"light_{len(self._env.lights)}"
+        else:
             env_light_obj = self._world_maker.create_light_entity(
-                entity_id, description, entity.type
+                entity._to_spec(), description=description
             )
             self._world_maker.add_entity(
-                self._env.id, env_light_obj, pos=pos, quat=quat
+                self._env.id, env_light_obj, entity_id, pos=pos, rot=rot
             )
             return LightObject(env_light_obj, _create_sentinal=_CREATE_SENTINAL)
-        else:
-            raise NotImplementedError("Camera and light are not implemented")
+
+        # Should not reach
+        raise NotImplementedError("Wrong entity")
 
     type SurfaceRef = Any
     type AnchorRef = Any

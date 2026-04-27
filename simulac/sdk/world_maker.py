@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.sdk.environment_service.common.environment_build_service import (
+    IEnvironmentBuildService,
+)
 from simulac.sdk.environment_service.common.environment_service import (
     IEnvironmentManagementService,
 )
@@ -25,11 +28,17 @@ from simulac.sdk.runner_service.common.runner_service import (
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
+    from simulac.sdk.environment_service.common.model.entity import (
+        CameraSpec,
+        LightSpec,
+    )
+    from simulac.sdk.environment_service.common.randomize import (
+        RandomizableQuat,
+        RandomizableVec3,
+    )
     from simulac.sdk.runner_service.common.runner import IRunner
 
-    Position = tuple[float, float, float]
-    Quaternion = tuple[float, float, float, float]
-    type WorldEntity = (
+    WorldEntity = (
         EnvironmentStuffEntity
         | EnvironmentMachineEntity
         | EnvironmentCameraEntity
@@ -46,16 +55,20 @@ class WorldMakerFacade:
         LogService: ILogService,
         RunnerManagementService: IRunnerManagementService,
         EnvironmentManagementService: IEnvironmentManagementService,
+        EnvironmentBuildService: IEnvironmentBuildService,
     ):
         self.LogService = LogService
         self.RunnerManagementService = RunnerManagementService
         self.EnvironmentManagementService = EnvironmentManagementService
+        self.EnvironmentBuildService = EnvironmentBuildService
 
     def create_environment(
         self,
         default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
         env_uri_or_prebuilt_id: str | None = None,
     ) -> IEnvironment:
+        # TODO: @gangjeuk
+        # handle pre built env `env_uri_or_prebuilt_id`
         env_ret = self.EnvironmentManagementService.create_environment(default_engine)
 
         if env_ret[0] is None:
@@ -65,10 +78,9 @@ class WorldMakerFacade:
 
     def create_stuff_entity(
         self,
-        name: str,
-        physics_uri_or_prebuilt_name: str,
-        mesh_uri: str,
-        texture_uri: str,
+        asset_uri_or_prebuilt_name: str,
+        *,
+        description: str = "",
     ) -> EnvironmentStuffEntity:
         """_summary_
             TODO:
@@ -85,13 +97,15 @@ class WorldMakerFacade:
         rendering = RenderingComponent(mesh_uri, texture_uri)
         physics = MJCFPhysicsComponent(physics_uri_or_prebuilt_name)
         entity = EnvironmentStuffEntity(None, name, "", rendering, physics)
+        entity = EnvironmentStuffEntity(None, description, rendering, physics)
 
         return entity
 
     def create_machine_entity(
         self,
-        name: str,
-        physics_uri_or_prebuilt_name: str,
+        asset_uri_or_prebuilt_name: str,
+        *,
+        description: str = "",
     ) -> EnvironmentMachineEntity:
         """_summary_
             TODO:
@@ -105,72 +119,49 @@ class WorldMakerFacade:
         """
         # TODO: @gangjeuk
         # handle both cases, file://home/gangjeuk/fanda.xml and https://remote/fanda.xml
-        entity = EnvironmentMachineEntity(None, name, "", physics_uri_or_prebuilt_name)
-
+        entity = EnvironmentMachineEntity(None, description, asset_uri_or_prebuilt_name)
+        self.EnvironmentBuildService.build_env()
         return entity
 
     def create_camera_entity(
         self,
-        name: str,
-        type: Literal[
-            "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
-        ] = "rgb",
+        spec: CameraSpec,
+        *,
+        description: str,
     ):
-        entity = EnvironmentCameraEntity(None, name, "", type)
+        entity = EnvironmentCameraEntity(
+            None,
+            description,
+            spec,
+        )
         return entity
 
     def create_light_entity(
         self,
-        name: str,
-        type: Literal["ambient", "pointlight", "reactarea", "spot"],
+        spec: LightSpec,
+        *,
+        description: str = "",
     ):
-        entity = EnvironmentLightEntity(None, name, "", type, (0xFF, 0xFF, 0xFF))
+        entity = EnvironmentLightEntity(None, description, spec=spec)
         return entity
 
     def add_entity(
         self,
         env_id: str,
         entity: WorldEntity,
-        *,
-        pos: Position = (0, 0, 0),
-        quat: Quaternion = (0, 0, 0, 1),
+        entity_id: str | None = None,
+        pos: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
     ) -> str:
-        entity.pos = pos
-        entity.quat = quat
-
         env_ret = self.EnvironmentManagementService.get_environment(env_id)
-
         if env_ret[0] is None:
             raise env_ret[1]
 
         env = env_ret[0]
-        entity_id = ""
 
-        if entity.id is not None:
-            # Should not reach
-            raise SimulacBaseError("Entity should not have id property")
-
-        if isinstance(entity, EnvironmentStuffEntity):
-            entity_id = f"ent_stu_{len(env.objects)}"
-            entity.id = entity_id
-            env.objects.append(entity)
-        elif isinstance(entity, EnvironmentMachineEntity):
-            entity_id = f"ent_mac_{len(env.machines)}"
-            entity.id = entity_id
-            env.machines.append(entity)
-        elif isinstance(entity, EnvironmentCameraEntity):
-            entity_id = f"ent_cam_{len(env.cameras)}"
-            entity.id = entity_id
-            env.cameras.append(entity)
-        elif isinstance(entity, EnvironmentLightEntity):  # pyright: ignore[reportUnnecessaryIsInstance]
-            entity_id = f"ent_lig_{len(env.lights)}"
-            entity.id = entity_id
-            env.lights.append(entity)
-        else:
-            # Should not reach
-            raise SimulacBaseError(f"Unknown environment entity type: {entity}")
-
-        return entity_id
+        return self.EnvironmentBuildService.add_entity(
+            env.id, entity, entity_id, pos, rot
+        )
 
     def create_runner(self, env_id: str) -> IRunner:
 

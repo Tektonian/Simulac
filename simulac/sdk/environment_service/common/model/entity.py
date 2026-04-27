@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Tuple
 
 if TYPE_CHECKING:
@@ -9,111 +10,174 @@ if TYPE_CHECKING:
         URDFPhysicsComponent,
         USDPhysicsComponent,
     )
+    from simulac.sdk.environment_service.common.randomize import (
+        RandomizableBool,
+        RandomizableColor,
+        RandomizableFloat,
+        RandomizableFloatList,
+        RandomizableQuat,
+        RandomizableVec3,
+    )
 
 
-class EnvironmentCameraEntity:
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        type: Literal[
-            "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
-        ] = "rgb",
-        mode: Literal["fixed", "track"] = "track",
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        lookat: Tuple[float, float, float] = (0, 0, 0),
-        fov: float = 50.0,
-        aspect: float = 1.0,
-        near: float = 100.0,
-        far: float = 1000.0,
-    ) -> None:
-        self.name = name
-        self.description = description
-        self.type = type
-        self.mode = mode
-        self.pos = pos
-        self.quat = quat
-        self.lookat = lookat
-        self.fov = fov
-        self.aspect = aspect
-        self.near = near
-        self.far = far
-
-
+@dataclass(slots=True)
 class EnvironmentMachineEntity:
-    def __init__(
-        self,
-        id: str,
-        description: str,
-        uri: str,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-    ) -> None:
-        self.id = id
-        self.name = name
-        self.description = description
-        self.uri = uri
-        self.pos = pos
-        self.quat = quat
+    id: str | None = None
+    description: str = ""
+    pos: RandomizableVec3 = (0, 0, 0)
+    quat: RandomizableQuat = (0, 0, 0, 1)
 
-        # Should have same length
-        self.init_position: list[float] | None = None
-        self.action_min: list[float] | None = None
-        self.action_max: list[float] | None = None
+    init_position: RandomizableFloatList | None = None
+    action_max: list[float] | None = None
+    action_min: list[float] | None = None
 
 
-class EnvironmentLightEntity:
-    def __init__(
-        self,
-        id: str,
-        description: str,
-        type: Literal["ambient", "pointlight", "reactarea", "spot"],
-        color: Tuple[int, int, int],
-        intensity: float = 0.8,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-    ) -> None:
-        self.id = id
-        self.description = description
-        self.type = type
-        self.color = color
-        self.intensity = intensity
-        self.pos = pos
-        self.quat = quat
-
-
+@dataclass(slots=True)
 class EnvironmentStuffEntity:
-    def __init__(
-        self,
-        id: str,
-        description: str,
-        rendering: RenderingComponent,
-        physics: MJCFPhysicsComponent | URDFPhysicsComponent | USDPhysicsComponent,
-        pos: Tuple[float, float, float] = (0, 0, 0),
-        quat: Tuple[float, float, float, float] = (0, 0, 0, 1),
-        size: Tuple[float, float, float] = (1, 1, 1),
-        fixed: bool = True,
-    ) -> None:
-        self.id = id
-        self.description = description
-        self.physics = physics
-        self.rendering = rendering
+    id: str | None = None
+    description: str = ""
+    asset_uri: list[str] = []
+    pos: RandomizableVec3 = (0, 0, 0)
+    quat: RandomizableQuat = (0, 0, 0, 1)
+    size: RandomizableVec3 = (1, 1, 1)
+    fixed: RandomizableBool = True
 
-        self.pos = pos
-        self.quat = quat
-        self.size = size
-        self.fixed = fixed
 
-    def to_dict(self):
-        return dict(
-            id=self.id,
-            mjcf_uri=self.physics.mjcf_uri,
-            pos=self.pos,
-            quat=self.quat,
-            friction=self.physics.friction,
-            solimp=self.physics.solimp,
-            solref=self.physics.solref,
-            mass=self.physics.mass,
-            density=self.physics.density,
-        )
+@dataclass(slots=True)
+class TransformSpec:
+    pos: RandomizableVec3 = (0, 0, 0)
+    quat: RandomizableQuat = (0, 0, 0, 1)
+
+
+@dataclass(slots=True)
+class EntityRef:
+    entity_id: str
+
+
+@dataclass(slots=True)
+class AnchorRef:
+    entity_id: str
+    anchor: str
+
+
+@dataclass(slots=True)
+class ColliderRef:
+    entity_id: str
+    collider: str
+
+
+@dataclass(slots=True)
+class WorldPointRef:
+    pos: RandomizableVec3
+
+
+type SpatialRef = EntityRef | AnchorRef | ColliderRef | WorldPointRef
+
+
+@dataclass(slots=True)
+class AttachSpec:
+    target: EntityRef | AnchorRef
+    offset: TransformSpec = field(default_factory=TransformSpec)
+    offset_frame: Literal["target", "world"] = "target"
+
+
+@dataclass(slots=True)
+class LookAtSpec:
+    target: SpatialRef
+    up: RandomizableVec3 = (0, 0, 1)
+    offset: RandomizableVec3 = (0, 0, 0)
+    offset_frame: Literal["target", "world"] = "world"
+
+
+@dataclass(slots=True)
+class TrackSpec:
+    target: SpatialRef
+    keep_offset: bool = True
+    offset_frame: Literal["target", "world"] = "world"
+
+
+@dataclass(slots=True)
+class AmbientLightSpec:
+    type: Literal["ambient"] = "ambient"
+    enabled: RandomizableBool = True
+    color: RandomizableColor = (255, 255, 255)
+    intensity: RandomizableFloat = 0.8
+
+
+@dataclass(slots=True)
+class PointLightSpec:
+    type: Literal["pointlight"] = "pointlight"
+    color: RandomizableColor = (255, 255, 255)
+    enabled: RandomizableBool = True
+    intensity: RandomizableFloat = 0.8
+    range: RandomizableFloat | None = None
+    decay: RandomizableFloat = 2.0
+
+
+@dataclass(slots=True)
+class SpotLightSpec:
+    type: Literal["spot"] = "spot"
+    color: RandomizableColor = (255, 255, 255)
+    enabled: RandomizableBool = True
+    intensity: RandomizableFloat = 0.8
+    range: RandomizableFloat | None = None
+    decay: RandomizableFloat = 2.0
+    angle: RandomizableFloat = 45.0
+    penumbra: RandomizableFloat = 0.0
+
+
+@dataclass(slots=True)
+class AreaLightSpec:
+    type: Literal["area"] = "area"
+    color: RandomizableColor = (255, 255, 255)
+    enabled: RandomizableBool = True
+    intensity: RandomizableFloat = 0.8
+    width: RandomizableFloat = 1.0
+    height: RandomizableFloat = 1.0
+
+
+type LightType = Literal["ambient", "pointlight", "rectarea", "spot"]
+type LightSpec = AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSpec
+
+
+@dataclass(slots=True)
+class EnvironmentLightEntity:
+    id: str | None = None
+    description: str = ""
+    pos: RandomizableVec3 = (0, 0, 0)
+    quat: RandomizableQuat = (0, 0, 0, 1)
+    spec: LightSpec = field(default_factory=PointLightSpec)
+
+    attach: AttachSpec | None = None
+    look_at: LookAtSpec | None = None
+    track: TrackSpec | None = None
+
+
+type CameraType = Literal[
+    "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
+]
+type CameraMode = Literal["fixed", "track"]
+
+
+@dataclass(frozen=True, slots=True)
+class CameraSpec:
+    type: CameraType = "rgb"
+    mode: CameraMode = "track"
+    lookat: RandomizableVec3 = (0, 0, 0)
+    fov: RandomizableFloat = 50.0
+    aspect: RandomizableFloat = 1.0
+    near: RandomizableFloat = 100.0
+    far: RandomizableFloat = 1000.0
+
+
+@dataclass(slots=True)
+class EnvironmentCameraEntity:
+    id: str | None = None
+    description: str = ""
+    spec: CameraSpec = field(default_factory=CameraSpec)
+    pos: RandomizableVec3 = (0, 0, 0)
+    quat: RandomizableQuat = (0, 0, 0, 1)
+
+    attach: AttachSpec | None = None
+    look_at: LookAtSpec | None = None
+    track: TrackSpec | None = None

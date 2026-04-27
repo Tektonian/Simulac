@@ -32,6 +32,7 @@ class Runner:
 
         self._runner = self._world_maker.create_runner(env._env.id)
 
+        # Freeze and prevent changes in env
         env._freeze()
 
     def step(self, action: list[float]):
@@ -41,7 +42,8 @@ class Runner:
 
     type State = Any
 
-    def reset(self) -> State: ...
+    def reset(self) -> State:
+        self._runner.reset()
 
     def get_state(self): ...
 
