@@ -10,6 +10,34 @@ import mujoco
 import mujoco.viewer
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.base.utils.rotation import euler_to_quat
+from simulac.sdk.environment_service.common.model.ref import (
+    AnchorPosRef,
+    AnchorRef,
+    BuildOpBase,
+    ColliderCenterRef,
+    ColliderRef,
+    JointAxisRef,
+    JointRef,
+    PlaceOp,
+    PointRefBase,
+    RefBase,
+    SetColliderFrictionOp,
+    SetJointDampingOp,
+    SetJointFrictionOp,
+    SetJointPosOp,
+    SupportPointRef,
+    SurfaceCenterRef,
+    SurfaceNormalRef,
+    SurfaceSampleRef,
+    WorldPointRef,
+)
+from simulac.sdk.environment_service.common.randomize import (
+    ChoiceRandomSpec,
+    EntryRandomSpec,
+    NormalRandomSpec,
+    UniformRandomSpec,
+)
 from simulac.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
@@ -157,6 +185,65 @@ class MujocoEntityBinding:
     root_freejoint_id: int = -1
     mocap_id: int = -1
 
+
+def _wxyz_to_xyzw(quat: Any) -> list[float]:
+    return [float(quat[1]), float(quat[2]), float(quat[3]), float(quat[0])]
+
+
+def _xyzw_to_wxyz(quat: Any) -> list[float]:
+    return [float(quat[3]), float(quat[0]), float(quat[1]), float(quat[2])]
+
+
+class MujocoRefResolver:
+    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData) -> None:
+        self.model = model
+        self.data = data
+
+    def _id(self, obj_type: mujoco.mjtObj, entity_id: str, name: str) -> int:
+        idx = mujoco.mj_name2id(self.model, obj_type, f"{entity_id}/{name}")
+        if idx < 0:
+            raise SimulacBaseError(f"No MuJoCo object named {entity_id}/{name}")
+        return idx
+
+    def resolve_point(self, ref: RefBase) -> list[float]:
+        if isinstance(ref, WorldPointRef):
+            if not isinstance(ref.pos, tuple):
+                raise SimulacBaseError(
+                    f"Resolved ref point must be tuple {ref}/{ref.pos}"
+                )
+            pos = ref.pos
+            return [float(pos[0]), float(pos[1]), float(pos[2])]
+
+        if isinstance(ref, (AnchorRef, AnchorPosRef)):
+            sid = self._id(mujoco.mjtObj.mjOBJ_SITE, ref.entity_id, ref.name)
+            return self.data.site_xpos[sid].copy().tolist()
+
+        if isinstance(ref, (ColliderRef, ColliderCenterRef)):
+            gid = self._id(mujoco.mjtObj.mjOBJ_GEOM, ref.entity_id, ref.name)
+            return self.data.geom_xpos[gid].copy().tolist()
+
+        raise SimulacBaseError(f"Unsupported point ref: {ref}")
+
+    def _joint_dims(self, joint_type: int) -> tuple[int, int]:
+        if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            return 7, 6
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            return 4, 3
+        return 1, 1
+
+
+def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
+    body_ids: list[int] = []
+    for bid in range(model.nbody):
+        cur = bid
+        while cur != 0:
+            if cur == root_body_id:
+                body_ids.append(bid)
+                break
+            cur = int(model.body_parentid[cur])
+    return body_ids
+
+
 class MujocoRunner(IRunner):
     def __init__(
         self,
@@ -179,15 +266,23 @@ class MujocoRunner(IRunner):
 
     def initialize(self) -> None:
         self._data = mujoco.MjData(self.mj_model)
+        mujoco.mj_forward(self.mj_model, self._data)
+
+    def _require_data(self) -> mujoco.MjData:
+        if self._data is None:
+            raise SimulacBaseError("Runner must be initialized")
+        return self._data
 
     def step(self, action: list[float]) -> None:
-        if self._data is None:
-            raise SimulacBaseError("Runner must be initialized before step()")
-
-        self._data.ctrl = action
-
-        mujoco.mj_step(self.mj_model, self._data)
-
+        data = self._require_data()
+        # TODO: @gangjeuk
+        # seperate action spaces by each `Robot` instance
+        if len(action) != self.mj_model.nu:
+            raise SimulacBaseError(
+                f"Action size mismatch: expected {self.mj_model.nu}, got {len(action)}"
+            )
+        data.ctrl[:] = action
+        mujoco.mj_step(self.mj_model, data)
         self.on_after_call_step(self.runner_id)
 
     def tick(self) -> None:
@@ -202,13 +297,164 @@ class MujocoRunner(IRunner):
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
     def render(self) -> None: ...
-    def reset(self) -> None:
-        if self._data is not None:
-            mujoco.mj_resetData(self.mj_model, self._data)
     def reset(self, seed: int | None = 0) -> None:
+        data = self._require_data()
+        sampler = ResetSampler(seed)
+        for _ in range(128):
+            candidate = self._sampling_candidate(sampler)
+            print(candidate)
+            mujoco.mj_resetData(self.mj_model, data)
+            self._apply_candidate(candidate)
+            mujoco.mj_forward(self.mj_model, data)
+            return  # self.get_state()
+
+        raise SimulacBaseError("Failed to sample valid reset state")
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)
+
+    def _sampling_candidate(self, sampler: ResetSampler) -> dict[str, dict[str, Any]]:
+        candidate = {}
+        for eid, entity in self._entities.items():
+            candidate[eid] = {
+                "pos": sampler.sample(entity.pos),
+                "rot": sampler.sample(entity.rot),
+                "constraints": {
+                    "pos": sampler.constraints(entity.pos),
+                    "rot": sampler.constraints(entity.rot),
+                },
+            }
+            for name in ("mass", "density", "friction", "size"):
+                if hasattr(entity, name):
+                    value = getattr(entity, name)
+                    if value is not None:
+                        candidate[eid][name] = sampler.sample(value)
+            candidate[eid]["build_ops"] = entity.build_ops
+        return candidate
+
+    def _apply_candidate(self, candidate: dict[str, dict[str, Any]]) -> None:
+        data = self._require_data()
+        resolver = MujocoRefResolver(self.mj_model, data)
+
+        for eid, values in candidate.items():
+            binding = self._bindings[eid]
+
+            pos = values.get("pos")
+            if isinstance(pos, RefBase):
+                pos = resolver.resolve_point(pos)
+            if pos is not None:
+                self._set_root_pos(
+                    binding,
+                    [float(pos[0]), float(pos[1]), float(pos[2])],
+                )
+
+            rot = values.get("rot")
+            if rot is not None and not isinstance(rot, RefBase):
+                self._set_root_rot(binding, rot)
+
+        mujoco.mj_forward(self.mj_model, data)
+
+        for eid, values in candidate.items():
+            for op in values.get("build_ops", []):
+                self._apply_build_op(eid, op, resolver)
+                mujoco.mj_forward(self.mj_model, data)
+
+        mujoco.mj_setConst(self.mj_model, data)
+
+    def _apply_build_op(
+        self, eid: str, op: BuildOpBase, resolver: MujocoRefResolver
+    ) -> None:
+        if isinstance(op, PlaceOp):
+            entity_id = op.entity.entity_id
+            binding = self._bindings.get(entity_id, self._bindings[eid])
+            data = self._require_data()
+
+            target_point = resolver.resolve_point(op.target)
+
+            if op.source is None:
+                source_pos = data.xpos[binding.root_body_id]
+                source_point = [
+                    float(source_pos[0]),
+                    float(source_pos[1]),
+                    float(source_pos[2]),
+                ]
+            else:
+                source_point = resolver.resolve_point(op.source)
+
+            delta = [
+                float(target_point[0]) - float(source_point[0]),
+                float(target_point[1]) - float(source_point[1]),
+                float(target_point[2]) - float(source_point[2]),
+            ]
+
+            if binding.root_freejoint_id >= 0:
+                qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
+                data.qpos[qadr : qadr + 3] = [
+                    float(data.qpos[qadr]) + delta[0],
+                    float(data.qpos[qadr + 1]) + delta[1],
+                    float(data.qpos[qadr + 2]) + delta[2],
+                ]
+            else:
+                root_pos = self.mj_model.body_pos[binding.root_body_id]
+                self.mj_model.body_pos[binding.root_body_id] = [
+                    float(root_pos[0]) + delta[0],
+                    float(root_pos[1]) + delta[1],
+                    float(root_pos[2]) + delta[2],
+                ]
+            return
+
+        raise SimulacBaseError(f"Unsupported build op: {type(op).__name__}")
+
+    def _set_root_pos(
+        self, binding: MujocoEntityBinding, pos: tuple[float, float, float]
+    ) -> None:
+        if binding.root_freejoint_id >= 0:
+            qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
+            self._require_data().qpos[qadr : qadr + 3] = list(pos)
+        else:
+            self.mj_model.body_pos[binding.root_body_id] = list(pos)
+
+    def _set_root_rot(
+        self, binding: MujocoEntityBinding, rot_xyzw: tuple[float, float, float]
+    ) -> None:
+        quat_wxyz = _xyzw_to_wxyz(euler_to_quat(*rot_xyzw))
+        if binding.root_freejoint_id >= 0:
+            qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
+            self._require_data().qpos[qadr + 3 : qadr + 7] = quat_wxyz
+        else:
+            self.mj_model.body_quat[binding.root_body_id] = quat_wxyz
+
+    def _constraints_pass(self, candidate: dict[str, dict[str, Any]]) -> bool:
+        for eid, values in candidate.items():
+            for c in values.get("constraints", {}).get("pos", []):
+                if not self._constraint_pass(eid, c):
+                    return False
+        return True
+
+    def _constraint_pass(self, eid: str, c: dict[str, Any]) -> bool:
+        typ = c["type"]
+        pos = self._require_data().xpos[self._bindings[eid].root_body_id].copy()
+
+        if typ == "bbox":
+            lo = c["min"]
+            hi = c["max"]
+            inside = all(
+                float(lo[i]) <= float(pos[i]) <= float(hi[i]) for i in range(3)
+            )
+            return inside if c["mode"] == "inside" else not inside
+
+        if typ == "distance":
+            a, b = c["between"]
+            pa = self._require_data().xpos[self._bindings[a].root_body_id]
+            pb = self._require_data().xpos[self._bindings[b].root_body_id]
+            d = sqrt(
+                (float(pa[0]) - float(pb[0])) * (float(pa[0]) - float(pb[0]))
+                + (float(pa[1]) - float(pb[1])) * (float(pa[1]) - float(pb[1]))
+                + (float(pa[2]) - float(pb[2])) * (float(pa[2]) - float(pb[2]))
+            )
+            return float(c["min"]) <= d <= float(c["max"])
+
+        raise SimulacBaseError(f"Unsupported constraint: {typ}")
 
 
 class MujocoAdapter(IPhysicsEngineAdapter):
