@@ -27,7 +27,6 @@ if TYPE_CHECKING:
         LightSpec,
     )
     from simulac.sdk.environment_service.common.randomize import (
-        RandomizableQuat,
         RandomizableVec3,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
@@ -85,10 +84,7 @@ class WorldMakerFacade:
         """
         # TODO: @gangjeuk
         # handle both cases, file://home/gangjeuk/fanda.xml and https://remote/fanda.xml
-        rendering = RenderingComponent(mesh_uri, texture_uri)
-        physics = MJCFPhysicsComponent(physics_uri_or_prebuilt_name)
-        entity = EnvironmentStuffEntity(None, name, "", rendering, physics)
-        entity = EnvironmentStuffEntity(None, description, rendering, physics)
+        entity = EnvironmentStuffEntity(None, description, asset_uri_or_prebuilt_name)
 
         return entity
 
@@ -111,7 +107,7 @@ class WorldMakerFacade:
         # TODO: @gangjeuk
         # handle both cases, file://home/gangjeuk/fanda.xml and https://remote/fanda.xml
         entity = EnvironmentMachineEntity(None, description, asset_uri_or_prebuilt_name)
-        self.EnvironmentBuildService.build_env()
+
         return entity
 
     def create_camera_entity(
