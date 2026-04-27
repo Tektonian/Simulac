@@ -10,7 +10,6 @@ from simulac.sdk.environment_service.common.model.ref import (
     EntityRef,
     JointRef,
     PlaceOp,
-    PlaceTargetRef,
     as_place_source,
     as_place_target,
 )
@@ -182,6 +181,17 @@ class Environment:
             margin=0.04
         )
         """
+        self._assert_mutable()
+        if obj._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+        obj._entity.build_ops.append(
+            PlaceOp(
+                EntityRef(obj._entity.id),
+                as_place_target(on, margin=margin),
+                as_place_source(using),
+                margin,
+            )
+        )
 
     @overload
     def remove_object(
@@ -295,7 +305,8 @@ class StuffObject:
         """
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        return ColliderRef(self._entity.id, name, _build_ops=self._entity.build_ops)
+        ref = ColliderRef(self._entity.id, name)
+        return ref
 
     def joint(self, name: str) -> JointRef:
         """When user want to control joint
