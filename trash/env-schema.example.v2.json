@@ -1,0 +1,142 @@
+{
+  "schema_version": "0.1",
+  "world_id": "world_0",  // If user `Tektonian` upload this, this will be `Tektonian/world_01` world
+  "id": "env_0",          // And world_01 will contain `env_0` environment
+  "default_physics_engine": "mujoco",
+  "stuffs": [
+    {
+      "id": "table",
+      "description": "Fixed tabletop.",
+      "asset": {
+        "source": "file://trash/assets/furniture_sim/simpleTable.xml"
+      },
+      "pos": [0.0, 1.0, 0.0],
+      "rot": [0.0, 0.0, 0.0],
+      "size": [1.0, 1.0, 1.0],
+      "fixed": true,
+      "mass": null,
+      "friction": null,
+      "density": null
+    },
+    {
+      "id": "target",
+      "description": "Random object selected per reset.",
+      "asset": {
+        "type": "choice",
+        "values": [
+          {
+            "variant_id": "can",
+            "source": "file://trash/assets/asset/robosuite/objects/can.xml"
+          },
+          {
+            "variant_id": "milk",
+            "source": "Tektonian/Objects/mug/v1"
+          },
+          {
+            "variant_id": "bread",
+            "source": "https://assets.tektonian.com/objects/bread/bundle.json"
+          }
+        ],
+        "materialization": "preload_variants"
+      },
+      "pos": {
+        "type": "uniform",
+        "min": [0.3, -0.2, 0.8],
+        "max": [0.6, 0.2, 0.8]
+      },
+      "rot": [0.0, 0.0, 0.0],
+      "size": [1.0, 1.0, 1.0],
+      "fixed": false,
+      "mass": {
+        "type": "uniform",
+        "min": 0.08,
+        "max": 0.18
+      },
+      "friction": 1.0,
+      "density": null
+    }
+  ],
+  "machines": [
+    {
+      "id": "panda",
+      "description": "Franka Panda robot.",
+      "asset": {
+        "source": "file://trash/assets/asset/roboverse/franka/mjcf/panda.xml"
+      },
+      "pos": [0.0, 0.0, 0.0],
+      "rot": [0.0, 0.0, 0.0],
+      "init_position": null,
+      "action_min": null,
+      "action_max": null
+    }
+  ],
+  "cameras": [
+    {
+      "id": "front_rgb",
+      "description": "",
+      "pos": [0.7, -0.8, 1.3],
+      "rot": [0.0, 0.0, 0.0],
+      "spec": {
+        "type": "rgb",
+        "mode": "fixed",
+        "lookat": [0.4, 0.0, 0.8],
+        "fov": {
+          "type": "normal",
+          "mean": 58.0,
+          "std": 4.0,
+          "clip_min": 50.0,
+          "clip_max": 70.0
+        },
+        "aspect": 1.0,
+        "near": 0.01,
+        "far": 10.0
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "key_light",
+      "description": "",
+      "pos": [0.0, -0.6, 2.2],
+      "rot": [0.0, 0.0, 0.0],
+      "spec": {
+        "type": "spot",
+        "enabled": true,
+        "color": [255, 245, 230],
+        "intensity": 0.9,
+        "angle": 45.0,
+        "penumbra": 0.0,
+        "range": null,
+        "decay": 2.0
+      }
+    }
+  ],
+  "build_ops": [ // should change to `relations`?
+    {
+      "type": "place",
+      "entity": "target",
+      "target": {
+        "entity": "table",
+        "collider": "body_top",
+        "side": "up",
+        "margin": 0.02
+      },
+      "source": {
+        "entity": "target",
+        "collider": "bottom",
+        "side": "down"
+      }
+    }
+  ],
+  "constraints": [
+    // Constraints related
+    {
+      "type": "bbox",
+      "entity": "target",
+      "ref": "entity.pos",
+      "min": [0.2, -0.3, 0.75],
+      "max": [0.7, 0.3, 0.95],
+      "mode": "inside"
+    }
+  ]
+}
