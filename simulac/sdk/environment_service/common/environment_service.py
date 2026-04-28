@@ -107,8 +107,6 @@ class Environment(IEnvironment):
         self.world_id = world_id
 
         self.env_json_uri = ""
-        self.act_json_uri = ""
-        self.obs_json_uri = ""
 
         self.physics_engine = default_engine
 

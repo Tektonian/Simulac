@@ -14,10 +14,7 @@ from simulac.sdk.environment_service.common.model.entity import (
 )
 
 if TYPE_CHECKING:
-    from simulac.sdk.environment_service.common.model.entity import (
-        EnvironmentMJCFObjectEntity,
-        EnvironmentURDFObjectEntity,
-    )
+    from simulac.sdk.environment_service.common.model.ref import BuildOpType
 
 
 # https://gymnasium.farama.org/api/env/
@@ -27,8 +24,6 @@ class IEnvironment(ABC):
     id: str
     world_id: str
     env_json_uri: str | SplitResult
-    act_json_uri: str | SplitResult
-    obs_json_uri: str | SplitResult
 
     physics_engine: Literal["mujoco", "newton", "genesis", "remote"]
     solver: Literal[""]  # TODO: add later
@@ -39,11 +34,14 @@ class IEnvironment(ABC):
     cameras: list[EnvironmentCameraEntity] = field(default_factory=list)
     lights: list[EnvironmentLightEntity] = field(default_factory=list)
     machines: list[EnvironmentMachineEntity] = field(default_factory=list)
+
+    relations: list[BuildOpType] = field(default_factory=list)
+    constraints: list[dict[str, str]] = field(default_factory=list)
+
     # region TODO: implment later
     particles: list[Any] = field(default_factory=list)
     soft_bodies: list[Any] = field(default_factory=list)
     randoms: list[dict[str, dict[str, dict[str, str]]]] = field(default_factory=list)
-    constraints: list[dict[str, str]] = field(default_factory=list)
 
     # end-region
     @abstractmethod
