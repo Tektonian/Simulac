@@ -44,6 +44,7 @@ from simulac.sdk.runner_service.common.physics_engine_adapter import (
 )
 from simulac.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 from simulac.sdk.runner_service.common.runner_service import IRunnerManagementService
+from simulac.sdk.runner_service.local.mujoco.binding import MujocoEntityBinding
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -169,21 +170,6 @@ class ResetSampler:
         if isinstance(value, tuple):
             return tuple(max(v, l) for v, l in zip(value, limit))
         return max(value, limit)
-
-
-@dataclass(slots=True)
-class MujocoEntityBinding:
-    entity_id: str
-    kind: Literal["stuff", "machine", "camera", "light"]
-    root_body_id: int
-    pos: RandomizableVec3
-    rot: RandomizableVec3
-    body_ids: list[int] = field(default_factory=list[int])
-    geom_ids: list[int] = field(default_factory=list[int])
-    joint_ids: list[int] = field(default_factory=list[int])
-    actuator_ids: list[int] = field(default_factory=list[int])
-    root_freejoint_id: int = -1
-    mocap_id: int = -1
 
 
 def _wxyz_to_xyzw(quat: Any) -> list[float]:
