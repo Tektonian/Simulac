@@ -1,4 +1,6 @@
-from .lib.world_maker.entity import Camera, Light, Robot, Stuff
+from __future__ import annotations
+
+from .lib.world_maker.entity import Camera, Robot, Stuff
 from .lib.world_maker.object import (
     CameraObject,
     Environment,
@@ -11,7 +13,6 @@ __all__ = [
     "Robot",
     "Stuff",
     "Camera",
-    "Light",
     "Environment",
     "RobotObject",
     "StuffObject",
