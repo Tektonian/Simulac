@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.4 (2026-05-05)
+
+Add error recovery logic in `BenchmarkEnvironment` to prevent vectorized environments from crashing due to server-side errors.
+
+### Features
+
+* **lib:** add `BenchmarkEnvironment` error-recovery logic and recovery tests ([10758de](https://github.com/Tektonian/Simulac/commit/10758de)) ([#29](https://github.com/Tektonian/Simulac/pull/29))
+
+### Chores
+
+* **project:** prepare 0.0.4 release ([f0e6042](https://github.com/Tektonian/Simulac/commit/f0e6042)) ([#30](https://github.com/Tektonian/Simulac/pull/30))
+
+
+
 ## 0.0.3 (2026-04-19)
 
 Expand the CLI commands, fixed world-maker entity ID generation, and refactor the gym-style environment code.
