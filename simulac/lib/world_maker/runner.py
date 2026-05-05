@@ -7,84 +7,38 @@ from simulac.base.types.geometry import Vec3
 from simulac.sdk import obtain_runtime
 
 from .entity import ActionT
-from .object import _CREATE_SENTINAL, Environment
+from .object import (
+    _CREATE_SENTINAL,
+    CameraObject,
+    Environment,
+    LightObject,
+    RobotObject,
+    StuffObject,
+)
 
 if TYPE_CHECKING:
-    from .object import CameraObject, LightObject, RobotObject, StuffObject
-
-
-class Runner:
-    def __init__(
-        self,
-        env: Environment,
-        seed: int | None = 0,
-        tick: int | None = 5,  # 5ms
-        record_location: str
-        | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
-        /,
-        *,
-        runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
-    ):
-        self.seed = seed
-        self.tick_time = tick
-
-        self._world_maker = obtain_runtime().world_maker
-
-        self._runner = self._world_maker.create_runner(env._env.id)
-
-        # Freeze and prevent changes in env
-        env._freeze()
-
-    def step(self, action: list[float]):
-        self._runner.step(action)
-
-    def tick(self):
-        self._runner.tick()
-
-    type State = Any
-
-    def reset(self, seed: int | None = 0) -> State:
-        self._runner.reset(seed)
-
-    def get_state(self): ...
-
-    @overload
-    def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
-    @overload
-    def get_runtime_object(
-        self, obj: RobotObject[ActionT]
-    ) -> RobotRuntime[ActionT]: ...
-    @overload
-    def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
-    @overload
-    def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
-    def get_runtime_object(
-        self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
-    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime: ...
-
-    def close(self) -> None: ...
-
-    # For context manage
-    # e.g., `with Runner(env) as runner:`
-    def __enter__(self): ...
-    def __exit__(self, exc_type, exc, tb): ...
-
-    def _debug_render(self):
-        return self._runner._debug_render()
+    from simulac.sdk.runner_service.common.model.object import (
+        StuffRuntime as SDKStuffRuntime,
+    )
+    from simulac.sdk.runner_service.common.runner import IRunner
 
 
 class StuffRuntime:
     def __init__(
         self,
+        runtime_object: SDKStuffRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
+        self._runtime = runtime_object
 
     def change_mass(self, mass: float) -> None: ...
-    def change_pos(self, pos: Vec3) -> None: ...
+    def change_pos(self, pos: Vec3) -> None:
+        self._runtime.change_pos(pos)
+
     def change_size(self, size: Vec3) -> None: ...
     def change_fixed(self, is_fixed: bool) -> None: ...
     def change_friction(self, friction: float) -> None: ...
@@ -237,3 +191,66 @@ class RuntimeState:
                     print("Happy! Happy! https://upload.wikimedia.org/wikipedia/commons/0/04/So_happy_smiling_cat.jpg")
                     break
         """
+
+
+class Runner:
+    def __init__(
+        self,
+        env: Environment,
+        seed: int | None = 0,
+        tick: int | None = 5,  # 5ms
+        record_location: str
+        | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
+        /,
+        *,
+        runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
+    ):
+        self.seed = seed
+        self.tick_time = tick
+
+        self._world_maker = obtain_runtime().world_maker
+
+        self._runner = self._world_maker.create_runner(env._env.id)
+
+        # Freeze and prevent changes in env
+        env._freeze()
+
+    def step(self, action: list[float]):
+        self._runner.step(action)
+
+    def tick(self):
+        self._runner.tick()
+
+    type State = Any
+
+    def reset(self, seed: int | None = 0) -> State:
+        self._runner.reset(seed)
+
+    def get_state(self): ...
+
+    @overload
+    def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
+    @overload
+    def get_runtime_object(
+        self, obj: RobotObject[ActionT]
+    ) -> RobotRuntime[ActionT]: ...
+    @overload
+    def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
+    def get_runtime_object(
+        self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
+    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime:
+
+        runtime_object = self._runner.get_runtime_object(obj._entity.id)
+        return StuffRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+    def close(self) -> None: ...
+
+    # For context manage
+    # e.g., `with Runner(env) as runner:`
+    def __enter__(self): ...
+    def __exit__(self, exc_type, exc, tb): ...
+
+    def _debug_render(self):
+        return self._runner._debug_render()
