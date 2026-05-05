@@ -21,6 +21,11 @@ if TYPE_CHECKING:
         EnvironmentMachineEntity,
         EnvironmentStuffEntity,
     )
+    from simulac.sdk.environment_service.common.model.ref import (
+        ObjectRefType,
+        PlaceTargetRefType,
+        PointRefType,
+    )
     from simulac.sdk.environment_service.common.randomize import (
         Randomizable,
         RandomizableBool,
@@ -183,8 +188,8 @@ class Environment:
         self,
         obj: StuffObject | RobotObject[Any],
         *,
-        on: PlaceTargetRef,
-        using: PlaceTargetRef | None = None,
+        on: PlaceTargetRefType,
+        using: PlaceTargetRefType | None = None,
         margin: RandomizableFloat = 0.0,
     ):
         """
