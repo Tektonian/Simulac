@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class MujocoEntityBinding:
+class MujocoStuffBinding:
     entity_id: str
     kind: Literal["stuff", "machine", "camera", "light"]
     root_body_id: int

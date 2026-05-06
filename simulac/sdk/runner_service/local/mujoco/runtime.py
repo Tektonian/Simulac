@@ -10,7 +10,7 @@ from simulac.sdk.runner_service.common.model.runtime import IStuffRuntimeOps
 if TYPE_CHECKING:
     import mujoco
 
-    from .binding import MujocoEntityBinding
+    from .binding import MujocoStuffBinding
 
 
 def _wxyz_to_xyzw(quat: tuple[float, float, float, float]) -> list[float]:
@@ -27,7 +27,7 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
         entity_id: str,
         model: mujoco.MjModel,
         data: mujoco.MjData,
-        binding: MujocoEntityBinding,
+        binding: MujocoStuffBinding,
     ):
         self.id = entity_id
         self._model = model
