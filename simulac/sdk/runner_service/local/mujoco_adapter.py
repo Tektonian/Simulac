@@ -45,7 +45,7 @@ from simulac.sdk.runner_service.common.physics_engine_adapter import (
 )
 from simulac.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 from simulac.sdk.runner_service.common.runner_service import IRunnerManagementService
-from simulac.sdk.runner_service.local.mujoco.binding import MujocoEntityBinding
+from simulac.sdk.runner_service.local.mujoco.binding import MujocoStuffBinding
 from simulac.sdk.runner_service.local.mujoco.runtime import MujocoStuffRuntimeOps
 
 if TYPE_CHECKING:
@@ -231,7 +231,7 @@ class MujocoRunner(IRunner):
         env: IEnvironment,
         mj_model: mujoco.MjModel,
         entities: dict[str, EnvironmentMachineEntity | EnvironmentStuffEntity],
-        bindings: dict[str, MujocoEntityBinding],
+        bindings: dict[str, MujocoStuffBinding],
         on_after_call_step: Callable[[str], None],
     ) -> None:
         self.runner_type = "mujoco"
@@ -337,11 +337,11 @@ class MujocoRunner(IRunner):
             if isinstance(pos, RefBase):
                 pos = resolver.resolve_point(pos)
             if pos is not None:
-                runtime.change_pos([float(pos[0]), float(pos[1]), float(pos[2])])
+                runtime.change_pos((float(pos[0]), float(pos[1]), float(pos[2])))
 
             rot = values.get("rot")
             if rot is not None and not isinstance(rot, RefBase):
-                runtime.change_rot(rot)
+                runtime.change_quat(euler_to_quat(*rot))
 
         mujoco.mj_forward(self.mj_model, data)
 
@@ -463,7 +463,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
 
         self.model: mujoco.MjModel | None = None
         self.data: mujoco.MjData | None = None
-        self._bindings: dict[str, MujocoEntityBinding] = {}
+        self._bindings: dict[str, MujocoStuffBinding] = {}
 
         env_ret = self.EnvironmentManagementService.get_environment(self.env_id)
 
@@ -574,7 +574,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         pos: RandomizableVec3,
         rot: RandomizableVec3,
         kind: Literal["stuff", "machine"],
-    ) -> MujocoEntityBinding:
+    ) -> MujocoStuffBinding:
         root_name = f"{entity_id}/__root__"
         root_body_id = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_BODY, root_name
@@ -609,7 +609,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
                 root_freejoint_id = jid
                 break
 
-        return MujocoEntityBinding(
+        return MujocoStuffBinding(
             entity_id=entity_id,
             kind=kind,
             root_body_id=root_body_id,
