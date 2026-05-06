@@ -59,6 +59,10 @@ class WorldMakerFacade:
     ) -> IEnvironment:
         # TODO: @gangjeuk
         # handle pre built env `env_uri_or_prebuilt_id`
+        # [ ] - Download `Environment` definition data
+        # [ ] - build `Environment` from downloaded environment definition json
+        # [ ] - download assets in local
+
         env_ret = self.EnvironmentManagementService.create_environment(default_engine)
 
         if env_ret[0] is None:

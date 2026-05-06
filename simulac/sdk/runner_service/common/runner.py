@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, overload
+
+if TYPE_CHECKING:
+    from .model.runtime import StuffRuntime
 
 
 @dataclass
@@ -34,6 +37,9 @@ class IRunner(ABC):
     @abstractmethod
     def get_state(self) -> None:
         pass
+
+    @abstractmethod
+    def get_runtime_object(self, entity_id: str) -> StuffRuntime: ...
 
     @abstractmethod
     def clone_state(self) -> None: ...

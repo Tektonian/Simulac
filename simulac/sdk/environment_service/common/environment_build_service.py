@@ -60,7 +60,7 @@ class IEnvironmentBuildService(ServiceIdentifier["IEnvironmentBuildService"]):
     def change_pos(self, entity_id: str, pos: Tuple[float, float, float]): ...
 
     @abstractmethod
-    def change_quat(self, entity_id: str, quat: Tuple[float, float, float, float]): ...
+    def change_rot(self, entity_id: str, rot: Tuple[float, float, float]): ...
 
     @abstractmethod
     def export_env_json(self) -> str: ...
@@ -159,8 +159,8 @@ class EnvironmentBuildService(IEnvironmentBuildService):
     def change_pos(self, entity_id: str, pos: Tuple[float, float, float]):
         self.__get_entity(entity_id).pos = pos
 
-    def change_quat(self, entity_id: str, quat: Tuple[float, float, float, float]):
-        self.__get_entity(entity_id).quat = quat
+    def change_rot(self, entity_id: str, rot: Tuple[float, float, float]):
+        self.__get_entity(entity_id).rot = rot
 
     def __get_env(self, env_id: str) -> IEnvironment:
         env_ret = self.EnvironmentManagementService.get_environment(env_id)

@@ -30,8 +30,6 @@ class EnvironmentMachineEntity:
     action_max: list[float] | None = None
     action_min: list[float] | None = None
 
-    build_ops: list[BuildOpType] = field(default_factory=list)
-
 
 @dataclass(slots=True)
 class EnvironmentStuffEntity:
@@ -45,8 +43,6 @@ class EnvironmentStuffEntity:
     mass: RandomizableFloat | None = None
     friction: RandomizableFloat | None = None
     density: RandomizableFloat | None = None
-
-    build_ops: list[BuildOpType] = field(default_factory=list)
 
 
 @dataclass(slots=True)

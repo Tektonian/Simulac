@@ -21,6 +21,11 @@ if TYPE_CHECKING:
         EnvironmentMachineEntity,
         EnvironmentStuffEntity,
     )
+    from simulac.sdk.environment_service.common.model.ref import (
+        ObjectRefType,
+        PlaceTargetRefType,
+        PointRefType,
+    )
     from simulac.sdk.environment_service.common.randomize import (
         Randomizable,
         RandomizableBool,
@@ -50,8 +55,8 @@ _CREATE_SENTINAL = object()
 class Environment:
     def __init__(
         self,
-        default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
         env_uri_or_prebuilt_id: str | None = None,
+        default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
     ) -> None:
         self._runtime = obtain_runtime()
         self._world_maker = self._runtime.world_maker
@@ -79,6 +84,21 @@ class Environment:
 
     # NOTE: @gangjeuk
     # Should be `place()`?
+
+    # Entity ID pattern
+    #   entity_id: lower_snake_case
+    #   qualified ref: <entity_id>.<kind>.<name>
+    # e.g., entity_id
+    #   table
+    #   red_cube
+    #   panda
+    #   front_rgb
+    # e.g., qualified_ref
+    #   table.collider.top
+    #   table.anchor.workspace_center
+    #   panda.joint.wrist_1
+    #   front_rgb.camera.output
+
     @overload
     def add_entity(
         self,
@@ -168,8 +188,8 @@ class Environment:
         self,
         obj: StuffObject | RobotObject[Any],
         *,
-        on: PlaceTargetRef,
-        using: PlaceTargetRef | None = None,
+        on: PlaceTargetRefType,
+        using: PlaceTargetRefType | None = None,
         margin: RandomizableFloat = 0.0,
     ):
         """
@@ -184,7 +204,12 @@ class Environment:
         self._assert_mutable()
         if obj._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        obj._entity.build_ops.append(
+
+        # TODO: @gangjeuk
+        # [ ] - verify before place
+        # [o] - change `_entity.build_ops` to `_env.relations`
+
+        self._env.relations.append(
             PlaceOp(
                 EntityRef(obj._entity.id),
                 as_place_target(on, margin=margin),
