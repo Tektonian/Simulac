@@ -131,7 +131,7 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
         self._sync_model()
 
     def change_friction(self, friction: float) -> None:
-        if friction <= 0:
+        if friction < 0:
             raise SimulacBaseError("friction must be positive")
 
         binding = self._binding
