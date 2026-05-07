@@ -45,7 +45,13 @@ from simulac.sdk.runner_service.common.physics_engine_adapter import (
 )
 from simulac.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 from simulac.sdk.runner_service.common.runner_service import IRunnerManagementService
-from simulac.sdk.runner_service.local.mujoco.binding import MujocoStuffBinding
+from simulac.sdk.runner_service.local.mujoco.binding import (
+    MujocoActuatorBinding,
+    MujocoJointBinding,
+    MujocoLinkBinding,
+    MujocoRobotBinding,
+    MujocoStuffBinding,
+)
 from simulac.sdk.runner_service.local.mujoco.runtime import MujocoStuffRuntimeOps
 
 if TYPE_CHECKING:
@@ -230,16 +236,20 @@ class MujocoRunner(IRunner):
         runner_id: str,
         env: IEnvironment,
         mj_model: mujoco.MjModel,
-        entities: dict[str, EnvironmentMachineEntity | EnvironmentStuffEntity],
-        bindings: dict[str, MujocoStuffBinding],
+        stuff_entities: dict[str, EnvironmentStuffEntity],
+        machine_entities: dict[str, EnvironmentMachineEntity],
+        stuff_bindings: dict[str, MujocoStuffBinding],
+        machine_bindings: dict[str, MujocoRobotBinding],
         on_after_call_step: Callable[[str], None],
     ) -> None:
         self.runner_type = "mujoco"
         self.runner_id = runner_id
         self.env = env
         self.mj_model = mj_model
-        self._entities = entities
-        self._bindings = bindings
+        self._stuff_entities = stuff_entities
+        self._machine_entities = machine_entities
+        self._stuff_bindings = stuff_bindings
+        self._machine_bindings = machine_bindings
         self._runtimes = dict[str, StuffRuntime]()
         self.state = {}
         self.on_after_call_step = on_after_call_step
@@ -463,7 +473,8 @@ class MujocoAdapter(IPhysicsEngineAdapter):
 
         self.model: mujoco.MjModel | None = None
         self.data: mujoco.MjData | None = None
-        self._bindings: dict[str, MujocoStuffBinding] = {}
+        self._stuff_bindings: dict[str, MujocoStuffBinding] = {}
+        self._machine_bindings: dict[str, MujocoRobotBinding] = {}
 
         env_ret = self.EnvironmentManagementService.get_environment(self.env_id)
 
@@ -473,9 +484,8 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         env = env_ret[0]
         self.env = env
 
-        self._entities = {
-            e.id: e for e in [*env.stuffs, *env.machines] if e.id is not None
-        }
+        self._stuff_entities = {e.id: e for e in env.stuffs if e.id is not None}
+        self._machine_entities = {e.id: e for e in env.machines if e.id is not None}
 
         for stuff in env.stuffs:
             self.__add_stuff(stuff)
@@ -489,12 +499,12 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         """
         self.model = self.root_spec.compile()
         for stuff in env.stuffs:
-            self._bindings[stuff.id] = self.__build_binding(
-                stuff.id, stuff.pos, stuff.rot, "stuff"
+            self._stuff_bindings[stuff.id] = self.__build_stuff_binding(
+                stuff.id,
             )
         for machine in env.machines:
-            self._bindings[machine.id] = self.__build_binding(
-                machine.id, machine.pos, machine.rot, "machine"
+            self._machine_bindings[machine.id] = self.__build_machine_binding(
+                machine.id,
             )
 
     def create_runner(self) -> IRunner:
@@ -516,8 +526,10 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             new_runner_id,
             self.env,
             mj_model=self.model,
-            entities=self._entities,
-            bindings=self._bindings,
+            stuff_entities=self._stuff_entities,
+            machine_entities=self._machine_entities,
+            stuff_bindings=self._stuff_bindings,
+            machine_bindings=self._machine_bindings,
             on_after_call_step=on_after_runner_step,
         )
 
@@ -568,54 +580,291 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             child, frame=self.root_frame, prefix=f"{machine.id}/", suffix=""
         )
 
-    def __build_binding(
+    def __actuator_target(
+        self,
+        actuator_id: int,
+    ) -> tuple[
+        Literal["joint", "tendon", "site", "body", "unknown"], int | None, str | None
+    ]:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        model = self.model
+        trn_type = int(model.actuator_trntype[actuator_id])
+        target_id = int(model.actuator_trnid[actuator_id][0])
+
+        if target_id < 0:
+            return "unknown", None, None
+
+        if trn_type == mujoco.mjtTrn.mjTRN_JOINT:
+            return (
+                "joint",
+                target_id,
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, target_id),
+            )
+
+        if trn_type == mujoco.mjtTrn.mjTRN_TENDON:
+            return (
+                "tendon",
+                target_id,
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_TENDON, target_id),
+            )
+
+        if trn_type == mujoco.mjtTrn.mjTRN_SITE:
+            return (
+                "site",
+                target_id,
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SITE, target_id),
+            )
+
+        if trn_type == mujoco.mjtTrn.mjTRN_BODY:
+            return (
+                "body",
+                target_id,
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, target_id),
+            )
+
+        return "unknown", target_id, None
+
+    def __build_machine_binding(self, entity_id: str) -> MujocoRobotBinding:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        model = self.model
+        root_name = f"{entity_id}/__root__"
+        root_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, root_name)
+
+        if root_body_id < 0:
+            raise SimulacBaseError(f"No MuJoCo root body for machine {entity_id!r}")
+
+        body_ids = _subtree_body_ids(model, root_body_id)
+        geom_ids = [
+            gid for gid in range(model.ngeom) if int(model.geom_bodyid[gid]) in body_ids
+        ]
+        joint_ids = [
+            jid for jid in range(model.njnt) if int(model.jnt_bodyid[jid]) in body_ids
+        ]
+        actuator_ids: list[int] = []
+        for aid in range(model.nu):
+            target_type, target_id, _ = self.__actuator_target(aid)
+            if target_type == "joint" and target_id in joint_ids:
+                actuator_ids.append(aid)
+            elif target_type == "body" and target_id in body_ids:
+                actuator_ids.append(aid)
+            elif target_type in {"site", "tendon"}:
+                name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, aid)
+                if name and name.startswith(f"{entity_id}/"):
+                    actuator_ids.append(aid)
+
+        root_freejoint_id = -1
+
+        for jid in joint_ids:
+            if (
+                int(model.jnt_bodyid[jid]) == root_body_id
+                and int(model.jnt_type[jid]) == mujoco.mjtJoint.mjJNT_FREE
+            ):
+                root_freejoint_id = jid
+                break
+
+        links: dict[str, MujocoLinkBinding] = {}
+        for body_id in body_ids:
+            body_full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, body_id)
+                or f"body_{body_id}"
+            )
+            body_name = (
+                body_full_name.split("/", 1)[1]
+                if body_full_name.startswith(f"{entity_id}/")
+                else body_full_name
+            )
+            body_geom_ids = [
+                gid for gid in geom_ids if int(model.geom_bodyid[gid]) == body_id
+            ]
+            body_joint_ids = [
+                jid for jid in joint_ids if int(model.jnt_bodyid[jid]) == body_id
+            ]
+            child_body_ids = [
+                bid for bid in body_ids if int(model.body_parentid[bid]) == body_id
+            ]
+
+            links[body_name] = MujocoLinkBinding(
+                entity_id=entity_id,
+                full_name=body_full_name,
+                name=body_name,
+                body_id=body_id,
+                parent_body_id=int(model.body_parentid[body_id]),
+                child_body_ids=child_body_ids,
+                geom_ids=body_geom_ids,
+                joint_ids=body_joint_ids,
+                mocap_id=int(model.body_mocapid[body_id]),
+            )
+
+        joints: dict[str, MujocoJointBinding] = {}
+        for joint_id in joint_ids:
+            joint_full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+                or f"joint_{joint_id}"
+            )
+            joint_name = (
+                joint_full_name.split("/", 1)[1]
+                if joint_full_name.startswith(f"{entity_id}/")
+                else joint_full_name
+            )
+
+            joint_type = int(model.jnt_type[joint_id])
+            qpos_dim, qvel_dim = (1, 1)
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                qpos_dim, qvel_dim = (7, 6)
+            if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                qpos_dim, qvel_dim = (4, 3)
+
+            limited = bool(model.jnt_limited[joint_id])
+            joint_range: tuple[float, float] | None = None
+            if limited:
+                joint_range = (
+                    float(model.jnt_range[joint_id][0]),
+                    float(model.jnt_range[joint_id][1]),
+                )
+
+            joints[joint_name] = MujocoJointBinding(
+                entity_id=entity_id,
+                full_name=joint_full_name,
+                name=joint_name,
+                joint_id=joint_id,
+                body_id=int(model.jnt_bodyid[joint_id]),
+                joint_type=joint_type,
+                qpos_addr=int(model.jnt_qposadr[joint_id]),
+                qvel_addr=int(model.jnt_dofadr[joint_id]),
+                qpos_dim=qpos_dim,
+                qvel_dim=qvel_dim,
+                axis=(
+                    float(model.jnt_axis[joint_id][0]),
+                    float(model.jnt_axis[joint_id][1]),
+                    float(model.jnt_axis[joint_id][2]),
+                ),
+                range=joint_range,
+                limited=limited,
+            )
+
+        actuators: dict[str, MujocoActuatorBinding] = {}
+        for actuator_id in actuator_ids:
+            actuator_full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_id)
+                or f"actuator_{actuator_id}"
+            )
+            actuator_name = (
+                actuator_full_name.split("/", 1)[1]
+                if actuator_full_name.startswith(f"{entity_id}/")
+                else actuator_full_name
+            )
+
+            target_type, target_id, target_name = self.__actuator_target(actuator_id)
+
+            ctrl_range = None
+            if bool(model.actuator_ctrllimited[actuator_id]):
+                ctrl_range = (
+                    float(model.actuator_ctrlrange[actuator_id][0]),
+                    float(model.actuator_ctrlrange[actuator_id][1]),
+                )
+
+            force_range = None
+            if bool(model.actuator_forcelimited[actuator_id]):
+                force_range = (
+                    float(model.actuator_forcerange[actuator_id][0]),
+                    float(model.actuator_forcerange[actuator_id][1]),
+                )
+
+            act_range = None
+            if bool(model.actuator_actlimited[actuator_id]):
+                act_range = (
+                    float(model.actuator_actrange[actuator_id][0]),
+                    float(model.actuator_actrange[actuator_id][1]),
+                )
+
+            actuators[actuator_name] = MujocoActuatorBinding(
+                entity_id=entity_id,
+                name=actuator_name,
+                full_name=actuator_full_name,
+                actuator_id=actuator_id,
+                target_type=target_type,
+                target_id=target_id,
+                target_name=target_name,
+                ctrl_range=ctrl_range,
+                force_range=force_range,
+                act_range=act_range,
+                group=int(model.actuator_group[actuator_id]),
+            )
+
+            if target_type == "joint" and target_id is not None:
+                for joint_binding in joints.values():
+                    if joint_binding.joint_id == target_id:
+                        joint_binding.actuator_ids.append(actuator_id)
+                        break
+        return MujocoRobotBinding(
+            entity_id=entity_id,
+            name=entity_id,
+            full_name=entity_id,
+            root_body_id=root_body_id,
+            root_body_name="__root__",
+            root_body_full_name=root_name,
+            body_ids=body_ids,
+            geom_ids=geom_ids,
+            joint_ids=joint_ids,
+            actuator_ids=actuator_ids,
+            links=links,
+            joints=joints,
+            actuators=actuators,
+            root_freejoint_id=root_freejoint_id,
+            mocap_id=int(model.body_mocapid[root_body_id]),
+        )
+
+    def __build_stuff_binding(
         self,
         entity_id: str,
-        pos: RandomizableVec3,
-        rot: RandomizableVec3,
-        kind: Literal["stuff", "machine"],
     ) -> MujocoStuffBinding:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        model = self.model
+
         root_name = f"{entity_id}/__root__"
-        root_body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY, root_name
-        )
+        root_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, root_name)
 
         if root_body_id < 0:
             raise SimulacBaseError(f"No MuJoCo root body for entity {entity_id!r}")
 
-        body_ids = _subtree_body_ids(self.model, root_body_id)
+        body_ids = _subtree_body_ids(model, root_body_id)
         geom_ids = [
-            gid
-            for gid in range(self.model.ngeom)
-            if int(self.model.geom_bodyid[gid]) in body_ids
+            gid for gid in range(model.ngeom) if int(model.geom_bodyid[gid]) in body_ids
         ]
         joint_ids = [
-            jid
-            for jid in range(self.model.njnt)
-            if int(self.model.jnt_bodyid[jid]) in body_ids
+            jid for jid in range(model.njnt) if int(model.jnt_bodyid[jid]) in body_ids
         ]
-        actuator_ids = [
-            aid
-            for aid in range(self.model.nu)
-            if int(self.model.actuator_trnid[aid][0]) in joint_ids
-        ]
+        actuator_ids: list[int] = []
+        for aid in range(model.nu):
+            target_type, target_id, _ = self.__actuator_target(aid)
+            if target_type == "joint" and target_id in joint_ids:
+                actuator_ids.append(aid)
+            elif target_type == "body" and target_id in body_ids:
+                actuator_ids.append(aid)
+            elif target_type in {"site", "tendon"}:
+                name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, aid)
+                if name and name.startswith(f"{entity_id}/"):
+                    actuator_ids.append(aid)
 
         root_freejoint_id = -1
         for jid in joint_ids:
             if (
-                int(self.model.jnt_bodyid[jid]) == root_body_id
-                and self.model.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE
+                int(model.jnt_bodyid[jid]) == root_body_id
+                and model.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE
             ):
                 root_freejoint_id = jid
                 break
 
         return MujocoStuffBinding(
             entity_id=entity_id,
-            kind=kind,
             root_body_id=root_body_id,
             body_ids=body_ids,
-            pos=pos,
-            rot=rot,
             geom_ids=geom_ids,
             joint_ids=joint_ids,
             actuator_ids=actuator_ids,
