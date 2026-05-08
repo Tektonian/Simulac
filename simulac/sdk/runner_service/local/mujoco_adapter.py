@@ -250,7 +250,6 @@ class MujocoRunner(IRunner):
             for op in ops:
                 self._apply_build_op(eid, op, resolver)
                 mujoco.mj_forward(self.mj_model, data)
-        mujoco.mj_setConst(self.mj_model, data)
 
     def _apply_build_op(
         self, eid: str, op: BuildOpBase, resolver: MujocoRefResolver
