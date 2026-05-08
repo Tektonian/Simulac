@@ -91,7 +91,6 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
             data.qpos[qadr : qadr + 3] = list(pos)
         else:
             model.body_pos[binding.root_body_id] = list(pos)
-        self._sync_model()
 
     def change_quat(self, quat: tuple[float, float, float, float]):
         binding = self._binding
@@ -104,7 +103,6 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
             data.qpos[qadr + 3 : qadr + 7] = quat_wxyz
         else:
             model.body_quat[binding.root_body_id] = quat_wxyz
-        self._sync_model()
 
     def change_mass(self, mass: float) -> None:
         if mass <= 0:
@@ -138,9 +136,3 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
         model = self._model
         for geom_id in binding.geom_ids:
             model.geom_friction[geom_id][0] = float(friction)
-
-        self._sync_model()
-
-    def _sync_model(self):
-        """`mj_forward` doesn't increase time, only recalculate contact, geometry, etcs..."""
-        mujoco.mj_forward(self._model, self._data)
