@@ -4,12 +4,21 @@ import random
 from abc import ABCMeta
 from dataclasses import dataclass, field
 from math import sqrt
-from typing import TYPE_CHECKING, Any, Callable, Literal, MutableMapping, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Literal,
+    MutableMapping,
+    NotRequired,
+    TypedDict,
+)
 
 import mujoco
 import mujoco.viewer
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.base.types.geometry import Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk.environment_service.common.model.ref import (
     AnchorPosRef,
@@ -33,8 +42,11 @@ from simulac.sdk.environment_service.common.model.ref import (
     WorldPointRef,
 )
 from simulac.sdk.environment_service.common.randomize import (
+    BboxConstraintSpec,
     ChoiceRandomSpec,
+    DistanceConstraintSpec,
     EntryRandomSpec,
+    NonpenetrationConstraintSpec,
     NormalRandomSpec,
     UniformRandomSpec,
 )
@@ -45,6 +57,7 @@ from simulac.sdk.runner_service.common.physics_engine_adapter import (
 )
 from simulac.sdk.runner_service.common.runner import IRunner, IRunnerFactory
 from simulac.sdk.runner_service.common.runner_service import IRunnerManagementService
+from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoActuatorBinding,
     MujocoJointBinding,
@@ -53,6 +66,8 @@ from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoStuffBinding,
 )
 from simulac.sdk.runner_service.local.mujoco.runtime import MujocoStuffRuntimeOps
+
+from .mujoco.resolver import MujocoRefResolver
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -103,6 +118,34 @@ MUJOCO_SCENE = """
 </mujoco>
 """
 
+type _ConstraintSpec = (
+    BboxConstraintSpec | DistanceConstraintSpec | NonpenetrationConstraintSpec
+)
+
+type _SampledPoint = Vec3 | RefBase
+type _SampledRot = Vec3 | RefBase
+type _SampledFloat = float
+type _SampledSize = Vec3
+
+
+class _CandidateConstraints(TypedDict, total=False):
+    pos: list[_ConstraintSpec]
+    rot: list[_ConstraintSpec]
+
+
+class _EntityCandidate(TypedDict):
+    pos: _SampledPoint
+    rot: _SampledRot
+    constraints: _CandidateConstraints
+
+    mass: NotRequired[_SampledFloat]
+    density: NotRequired[_SampledFloat]
+    friction: NotRequired[_SampledFloat]
+    size: NotRequired[_SampledSize]
+
+
+type _ResetCandidate = dict[str, _EntityCandidate]
+
 
 def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
     body_ids: list[int] = []
@@ -136,10 +179,13 @@ class MujocoRunner(IRunner):
         self._machine_entities = machine_entities
         self._stuff_bindings = stuff_bindings
         self._machine_bindings = machine_bindings
-        self._runtimes = dict[str, StuffRuntime]()
+        self._stuff_runtimes = dict[str, StuffRuntime]()
         self.state = {}
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
+
+        self.__MAX_RESET_RETRY = 100
+        self.__reset_passed = False
 
     def initialize(self) -> None:
         self._data = mujoco.MjData(self.mj_model)
@@ -173,7 +219,7 @@ class MujocoRunner(IRunner):
 
     def get_runtime_object(self, entity_id: str):
         # breakpoint()
-        return self._runtimes.get(entity_id)
+        return self._stuff_runtimes.get(entity_id)
 
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
@@ -181,23 +227,33 @@ class MujocoRunner(IRunner):
     def reset(self, seed: int | None = 0) -> None:
         data = self._require_data()
         sampler = ResetSampler(seed)
+
         self._clean_runtime_stuff()
-        for _ in range(128):
+
+        retry_count = 0
+        while self.__reset_passed or retry_count <= self.__MAX_RESET_RETRY:
             candidate = self._sampling_candidate(sampler)
-            print(candidate)
-            self._create_runtime_stuff()
+
             mujoco.mj_resetData(self.mj_model, data)
-            self._apply_candidate(candidate)
+
+            self._apply_candidate(candidate, sampler)
+
+            mujoco.mj_setConst(self.mj_model, data)
             mujoco.mj_forward(self.mj_model, data)
-            return  # self.get_state()
+
+            if not self._constraints_pass(candidate):
+                continue
+            self._create_runtime_stuff()
+            self.__reset_passed = True
+            return
         raise SimulacBaseError("Failed to sample valid reset state")
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)
 
     def _sampling_candidate(self, sampler: ResetSampler) -> dict[str, dict[str, Any]]:
-        candidate = {}
-        for eid, entity in self._entities.items():
+        candidate: _ResetCandidate = {}
+        for eid, entity in self._stuff_entities.items():
             candidate[eid] = {
                 "pos": sampler.sample(entity.pos),
                 "rot": sampler.sample(entity.rot),
@@ -211,36 +267,70 @@ class MujocoRunner(IRunner):
                     value = getattr(entity, name)
                     if value is not None:
                         candidate[eid][name] = sampler.sample(value)
+        for eid, entity in self._machine_entities.items():
+            candidate[eid] = {
+                "pos": sampler.sample(entity.pos),
+                "rot": sampler.sample(entity.rot),
+                "constraints": {
+                    "pos": sampler.constraints(entity.pos),
+                    "rot": sampler.constraints(entity.rot),
+                },
+            }
         return candidate
 
     def _clean_runtime_stuff(self) -> None:
-        self._runtimes: dict[str, StuffRuntime] = dict()
+        self._stuff_runtimes: dict[str, StuffRuntime] = dict()
 
     def _create_runtime_stuff(self) -> None:
-        for eid, binding in self._bindings.items():
-            ops = MujocoStuffRuntimeOps(eid, self.mj_model, self._data, binding)
+        for eid, binding in self._stuff_bindings.items():
+            ops = MujocoStuffRuntimeOps(
+                eid, self.mj_model, self._require_data(), binding
+            )
 
             stuff_runtime = StuffRuntime(eid, ops)
-            self._runtimes[eid] = stuff_runtime
+            self._stuff_runtimes[eid] = stuff_runtime
 
-    def _apply_candidate(self, candidate: dict[str, dict[str, Any]]) -> None:
+    def _apply_candidate(
+        self, candidate: dict[str, dict[str, Any]], sampler: ResetSampler
+    ) -> None:
         data = self._require_data()
-        resolver = MujocoRefResolver(self.mj_model, data)
+        resolver = MujocoRefResolver(
+            self.mj_model,
+            data,
+            stuff_bindings=self._stuff_bindings,
+            machine_bindings=self._machine_bindings,
+        )
 
         for eid, values in candidate.items():
-            runtime = self._runtimes[eid]
+            binding = self._entity_binding(eid)
             pos = values.get("pos")
             if isinstance(pos, RefBase):
-                pos = resolver.resolve_point(pos)
-            if pos is not None:
-                runtime.change_pos((float(pos[0]), float(pos[1]), float(pos[2])))
+                pos = resolver.resolve_point(sampler.sample(pos))
 
             rot = values.get("rot")
+            quat = None
             if rot is not None and not isinstance(rot, RefBase):
-                runtime.change_quat(euler_to_quat(*rot))
+                quat = euler_to_quat(*rot)
+
+            self._apply_root_pose(binding, pos, quat)
+
+            friction = values.get("friction")
+            if (
+                eid in self._stuff_bindings
+                and friction is not None
+                and not isinstance(friction, RefBase)
+            ):
+                self._apply_stuff_friction(self._stuff_bindings[eid], friction)
+
+            mass = values.get("mass")
+            if (
+                eid in self._stuff_bindings
+                and mass is not None
+                and not isinstance(mass, RefBase)
+            ):
+                self._apply_stuff_mass(self._stuff_bindings[eid], mass)
 
         mujoco.mj_forward(self.mj_model, data)
-
         for eid, values in candidate.items():
             ops = [
                 placeop
@@ -248,18 +338,100 @@ class MujocoRunner(IRunner):
                 if placeop.entity.entity_id == eid
             ]
             for op in ops:
-                self._apply_build_op(eid, op, resolver)
+                self._apply_build_op(eid, op, resolver, sampler)
                 mujoco.mj_forward(self.mj_model, data)
 
-    def _apply_build_op(
-        self, eid: str, op: BuildOpBase, resolver: MujocoRefResolver
+    def _entity_binding(
+        self,
+        entity_id: str,
+    ) -> MujocoStuffBinding | MujocoRobotBinding:
+        binding = self._stuff_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._machine_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        raise SimulacBaseError(f"No MuJoCo binding for entity {entity_id!r}")
+
+    def _apply_root_pose(
+        self,
+        binding: MujocoStuffBinding | MujocoRobotBinding,
+        pos: Any,
+        quat: tuple[float, float, float, float] | None,
     ) -> None:
+        if pos is not None:
+            root_pos = (float(pos[0]), float(pos[1]), float(pos[2]))
+            if binding.root_freejoint_id >= 0:
+                qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
+                self._require_data().qpos[qadr : qadr + 3] = root_pos
+            else:
+                self.mj_model.body_pos[binding.root_body_id] = root_pos
+
+        if quat is not None:
+            quat_wxyz = [
+                float(quat[3]),
+                float(quat[0]),
+                float(quat[1]),
+                float(quat[2]),
+            ]
+            if binding.root_freejoint_id >= 0:
+                qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
+                self._require_data().qpos[qadr + 3 : qadr + 7] = quat_wxyz
+            else:
+                self.mj_model.body_quat[binding.root_body_id] = quat_wxyz
+
+    def _apply_stuff_friction(
+        self,
+        binding: MujocoStuffBinding,
+        friction: float,
+    ) -> None:
+        if friction < 0:
+            raise SimulacBaseError("friction must be non-negative")
+
+        for geom_id in binding.geom_ids:
+            self.mj_model.geom_friction[geom_id][0] = float(friction)
+
+    def _apply_stuff_mass(
+        self,
+        binding: MujocoStuffBinding,
+        mass: float,
+    ) -> None:
+        if mass <= 0:
+            raise SimulacBaseError("mass must be positive")
+
+        current_mass = sum(
+            float(self.mj_model.body_mass[body_id]) for body_id in binding.body_ids
+        )
+        if current_mass <= 0:
+            raise SimulacBaseError("current mass must be positive")
+
+        ratio = float(mass) / current_mass
+        for body_id in binding.body_ids:
+            self.mj_model.body_mass[body_id] = (
+                float(self.mj_model.body_mass[body_id]) * ratio
+            )
+            self.mj_model.body_inertia[body_id] = [
+                float(self.mj_model.body_inertia[body_id][0]) * ratio,
+                float(self.mj_model.body_inertia[body_id][1]) * ratio,
+                float(self.mj_model.body_inertia[body_id][2]) * ratio,
+            ]
+
+    def _apply_build_op(
+        self,
+        eid: str,
+        op: BuildOpBase,
+        resolver: MujocoRefResolver,
+        sampler: ResetSampler,
+    ) -> None:
+        data = self._require_data()
         if isinstance(op, PlaceOp):
             entity_id = op.entity.entity_id
-            binding = self._bindings.get(entity_id, self._bindings[eid])
-            data = self._require_data()
+            binding = self._entity_binding(entity_id)
 
-            target_point = resolver.resolve_point(op.target)
+            target_ref = sampler.sample(op.target)
+            target_point = resolver.resolve_point(target_ref)
 
             if op.source is None:
                 source_pos = data.xpos[binding.root_body_id]
@@ -269,7 +441,8 @@ class MujocoRunner(IRunner):
                     float(source_pos[2]),
                 ]
             else:
-                source_point = resolver.resolve_point(op.source)
+                source_ref = sampler.sample(op.source)
+                source_point = resolver.resolve_point(source_ref)
 
             delta = [
                 float(target_point[0]) - float(source_point[0]),
@@ -293,7 +466,110 @@ class MujocoRunner(IRunner):
                 ]
             return
 
+        if isinstance(op, SetColliderFrictionOp):
+            target = op.target
+            friction = float(sampler.sample(op.friction))
+
+            if friction < 0:
+                raise SimulacBaseError("fiction must be non-negative")
+
+            geom_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_GEOM, target.entity_id, target.name
+            )
+
+            self.mj_model.geom_friction[geom_id][0] = friction
+            return
+
+        if isinstance(op, SetJointPosOp):
+            target = op.target
+            pos = float(sampler.sample(op.pos))
+
+            joint_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_JOINT,
+                target.entity_id,
+                target.name,
+            )
+
+            joint_type = int(self.mj_model.jnt_type[joint_id])
+            if joint_type not in (
+                mujoco.mjtJoint.mjJNT_HINGE,
+                mujoco.mjtJoint.mjJNT_SLIDE,
+            ):
+                raise SimulacBaseError(
+                    "SetJointPosOp only supports hinge and slide joints"
+                )
+
+            qadr = int(self.mj_model.jnt_qposadr[joint_id])
+            data.qpos[qadr] = pos
+            return
+
+        if isinstance(op, SetJointFrictionOp):
+            target = op.target
+            friction = float(sampler.sample(op.friction))
+
+            if friction < 0:
+                raise SimulacBaseError("joint friction must be non-negative")
+
+            joint_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_JOINT,
+                target.entity_id,
+                target.name,
+            )
+
+            joint_type = int(self.mj_model.jnt_type[joint_id])
+            _, qvel_dim = (1, 1)
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                qvel_dim = 6
+
+            if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                qvel_dim = 3
+
+            dadr = int(self.mj_model.jnt_dofadr[joint_id])
+            self.mj_model.dof_frictionloss[dadr : dadr + qvel_dim] = [
+                friction
+            ] * qvel_dim
+            return
+
+        if isinstance(op, SetJointDampingOp):
+            target = op.target
+            damping = float(sampler.sample(op.damping))
+
+            if damping < 0:
+                raise SimulacBaseError("joint damping must be non-negative")
+
+            joint_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_JOINT,
+                target.entity_id,
+                target.name,
+            )
+
+            joint_type = int(self.mj_model.jnt_type[joint_id])
+            _, qvel_dim = (1, 1)
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                qvel_dim = 6
+
+            if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                qvel_dim = 3
+
+            dadr = int(self.mj_model.jnt_dofadr[joint_id])
+            self.mj_model.dof_damping[dadr : dadr + qvel_dim] = [damping] * qvel_dim
+            return
+
         raise SimulacBaseError(f"Unsupported build op: {type(op).__name__}")
+
+    def _named_id(
+        self,
+        obj_type: mujoco.mjtObj,
+        entity_id: str,
+        name: str,
+    ) -> int:
+        full_name = f"{entity_id}/{name}"
+        obj_id = mujoco.mj_name2id(self.mj_model, obj_type, full_name)
+
+        if obj_id < 0:
+            raise SimulacBaseError(f"No MuJoCo object named {full_name!r}")
+
+        return obj_id
 
     def _constraints_pass(self, candidate: dict[str, dict[str, Any]]) -> bool:
         for eid, values in candidate.items():
@@ -302,31 +578,82 @@ class MujocoRunner(IRunner):
                     return False
         return True
 
-    def _constraint_pass(self, eid: str, c: dict[str, Any]) -> bool:
-        typ = c["type"]
-        pos = self._require_data().xpos[self._bindings[eid].root_body_id].copy()
+    def _constraint_pass(self, eid: str, constraint: _ConstraintSpec) -> bool:
+        typ = constraint["type"]
 
         if typ == "bbox":
-            lo = c["min"]
-            hi = c["max"]
-            inside = all(
-                float(lo[i]) <= float(pos[i]) <= float(hi[i]) for i in range(3)
-            )
-            return inside if c["mode"] == "inside" else not inside
-
+            return self._bbox_constraint_pass(eid, constraint)
         if typ == "distance":
-            a, b = c["between"]
-            pa = self._require_data().xpos[self._bindings[a].root_body_id]
-            pb = self._require_data().xpos[self._bindings[b].root_body_id]
-            d = sqrt(
-                (float(pa[0]) - float(pb[0])) * (float(pa[0]) - float(pb[0]))
-                + (float(pa[1]) - float(pb[1])) * (float(pa[1]) - float(pb[1]))
-                + (float(pa[2]) - float(pb[2])) * (float(pa[2]) - float(pb[2]))
-            )
-            return float(c["min"]) <= d <= float(c["max"])
+            return self._distance_constraint_pass(constraint)
+        if typ == "nonpenetration":
+            return self._nonpenetration_constraint_pass(constraint)
 
         raise SimulacBaseError(f"Unsupported constraint: {typ}")
 
+    def _bbox_constraint_pass(self, eid: str, constraint: BboxConstraintSpec):
+        binding = self._entity_binding(eid)
+        pos = self._require_data().xpos[binding.root_body_id]
+
+        lo = constraint["min"]
+        hi = constraint["max"]
+
+        inside = all(float(lo[i]) <= float(pos[i]) <= float(hi[i]) for i in range(3))
+
+        mode = constraint.get("mode", "inside")
+        if mode == "inside":
+            return inside
+
+        if mode == "outside":
+            return not inside
+
+        raise SimulacBaseError(f"Unsupported bbox constraint mode: {mode}")
+
+    def _distance_constraint_pass(self, constraint: DistanceConstraintSpec):
+        a, b = constraint["between"]
+
+        a_binding = self._entity_binding(a)
+        b_binding = self._entity_binding(b)
+
+        data = self._require_data()
+        pa = data.xpos[a_binding.root_body_id]
+        pb = data.xpos[b_binding.root_body_id]
+
+        dx = float(pa[0]) - float(pb[0])
+        dy = float(pa[1]) - float(pb[1])
+        dz = float(pa[2]) - float(pb[2])
+
+        distance = sqrt(dx * dx + dy * dy + dz * dz)
+
+        return float(constraint["min"]) <= distance <= float(constraint["max"])
+
+    def _nonpenetration_constraint_pass(
+        self, constraint: NonpenetrationConstraintSpec
+    ) -> bool:
+        between = constraint["between"]
+        if len(between) < 2:
+            raise SimulacBaseError(
+                "nonpenetration constraint requires at least two entities"
+            )
+
+        for idx, a in enumerate(between):
+            for b in between[idx + 1 :]:
+                if not self._nonpenetration_pair_pass(a, b):
+                    return False
+
+        return True
+
+    def _nonpenetration_pair_pass(self, a: str, b: str) -> bool:
+        data = self._require_data()
+        a_geoms = set(self._entity_binding(a).geom_ids)
+        b_geoms = set(self._entity_binding(b).geom_ids)
+        for i in range(data.ncon):
+            contact = data.contact[i]
+            if contact.dist >= -1e-5:
+                continue
+            g1, g2 = int(contact.geom1), int(contact.geom2)
+            if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
+                return False
+        return True
 
 class MujocoAdapter(IPhysicsEngineAdapter):
     """_summary_
