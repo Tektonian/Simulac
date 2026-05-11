@@ -120,6 +120,30 @@ class ICameraRuntimeOps(Protocol):
     def change_fov(self, fov: float) -> None: ...
 
 
+class CameraRuntime:
+    def __init__(self, entity_id: str, ops: ICameraRuntimeOps) -> None:
+        self.id = entity_id
+        self._ops = ops
+
+    def get_pos(self) -> tuple[float, float, float]:
+        return self._ops.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._ops.get_quat()
+
+    def change_pos(self, pos: tuple[float, float, float]) -> None:
+        self._ops.change_pos(pos)
+
+    def change_quat(self, quat: tuple[float, float, float, float]) -> None:
+        self._ops.change_quat(quat)
+
+    def get_fov(self) -> float:
+        return self._ops.get_fov()
+
+    def change_fov(self, fov: float) -> None:
+        self._ops.change_fov(fov)
+
+
 class ILightRuntimeOps(Protocol):
     def get_pos(self) -> tuple[float, float, float]: ...
     def get_quat(self) -> tuple[float, float, float, float]: ...
