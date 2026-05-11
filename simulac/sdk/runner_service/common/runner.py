@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, overload
 
 if TYPE_CHECKING:
-    from .model.runtime import StuffRuntime
+    from .model.runtime import RobotRuntime, StuffRuntime
 
 
 @dataclass
@@ -39,7 +39,7 @@ class IRunner(ABC):
         pass
 
     @abstractmethod
-    def get_runtime_object(self, entity_id: str) -> StuffRuntime: ...
+    def get_runtime_object(self, entity_id: str) -> StuffRuntime | RobotRuntime: ...
 
     @abstractmethod
     def clone_state(self) -> None: ...
