@@ -73,18 +73,43 @@ class StuffRuntime:
 class RobotRuntime(Generic[ActionT]):
     def __init__(
         self,
+        runtime_object: SDKRobotRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create robot runtime directly")
+        self._runtime = runtime_object
 
-    def step(self, action: ActionT) -> None: ...
-    def tick(self) -> None: ...
+    def step(self, action: ActionT) -> None:
+        self._runtime.step(list(action))
 
-    def get_pos(self) -> Vec3: ...
-    def get_vel(self) -> list[float]: ...
+    def tick(self) -> None:
+        self._runtime.tick()
+
+    def get_pos(self) -> Vec3:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def get_joint_pos(self) -> list[float]:
+        return self._runtime.get_joint_pos()
+
+    def get_joint_vel(self) -> list[float]:
+        return self._runtime.get_joint_vel()
+
+    def change_joint_pos(self, joint_pos: list[float]) -> None:
+        self._runtime.change_joint_pos(joint_pos)
+
+    def change_joint_vel(self, joint_vel: list[float]) -> None:
+        self._runtime.change_joint_vel(joint_vel)
+
+    # NOTE: below two are future use,
+    # since our team concluded that we are focuing on `pos` control
+    def _change_target_vel(self, vel: float) -> None: ...
+    def _change_target_force(self, force: float) -> None: ...
 
 
 class CameraRuntime:
