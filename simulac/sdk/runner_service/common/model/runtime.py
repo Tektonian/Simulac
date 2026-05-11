@@ -61,6 +61,36 @@ class IRobotRuntimeOps(Protocol):
     def tick(self) -> None: ...
 
 
+class RobotRuntime:
+    def __init__(self, entity_id: str, ops: IRobotRuntimeOps) -> None:
+        self.id = entity_id
+        self._ops = ops
+
+    def get_pos(self) -> tuple[float, float, float]:
+        return self._ops.get_base_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._ops.get_base_quat()
+
+    def get_joint_pos(self) -> list[float]:
+        return self._ops.get_joint_pos()
+
+    def get_joint_vel(self) -> list[float]:
+        return self._ops.get_joint_vel()
+
+    def change_joint_pos(self, joint_pos: list[float]) -> None:
+        self._ops.change_joint_pos(joint_pos)
+
+    def change_joint_vel(self, joint_vel: list[float]) -> None:
+        self._ops.change_joint_vel(joint_vel)
+
+    def step(self, action: list[float]) -> None:
+        self._ops.step(action)
+
+    def tick(self) -> None:
+        self._ops.tick()
+
+
 class RobotJointRuntime:
     def get_pos(self) -> float: ...
     def get_vel(self) -> float: ...
