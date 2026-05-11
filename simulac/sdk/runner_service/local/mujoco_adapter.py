@@ -416,6 +416,264 @@ class MujocoRunner(IRunner):
             return binding
         raise SimulacBaseError(f"No MuJoCo binding for entity {entity_id!r}")
 
+    def _camera_binding(self, entity_id: str) -> MujocoCameraBinding:
+        binding = self._camera_bindings.get(entity_id)
+        if binding is None:
+            raise SimulacBaseError(f"No MuJoCo camera binding for entity {entity_id!r}")
+        return binding
+
+    def _apply_attach_op(
+        self,
+        op: AttachOp,
+        resolver: MujocoRefResolver,
+        sampler: ResetSampler,
+    ) -> None:
+        entity_id = op.entity.entity_id
+
+        if entity_id not in self._camera_bindings:
+            raise SimulacBaseError("AttachOp currently supports camera entities first")
+
+        binding = self._camera_bindings[entity_id]
+
+        parent_pos, parent_quat = resolver.resolve_frame(op.parent)
+
+        offset: Vec3 = sampler.sample(op.offset)
+
+        if op.offset_frame == "target":
+            x, y, z, w = parent_quat
+            vx, vy, vz = offset
+            # q * v * q^-1
+            # https://blog.molecular-matters.com/2013/05/24/a-faster-quaternion-vector-multiplication/
+            tx = 2.0 * (y * vz - z * vy)
+            ty = 2.0 * (z * vx - x * vz)
+            tz = 2.0 * (x * vy - y * vx)
+            offset_world = (
+                vx + w * tx + (y * tz - z * ty),
+                vy + w * ty + (z * tx - x * tz),
+                vz + w * tz + (x * ty - y * tx),
+            )
+        elif op.offset_frame == "world":
+            offset_world = offset
+        else:
+            raise SimulacBaseError(f"Unsupported offset frame: {op.offset_frame}")
+        rot: Quat = sampler.sample(op.rot)
+        local_quat = euler_to_quat(float(rot[0]), float(rot[1]), float(rot[2]))
+
+        # https://github.com/google-deepmind/mujoco/blob/5ee8bd7b9c3147f1094816882903e741e53c26bf/src/engine/engine_util_spatial.c#L66
+        ax, ay, az, aw = parent_quat
+        bx, by, bz, bw = local_quat
+        camera_quat: Quat = (
+            aw * bx + ax * bw + ay * bz - az * by,
+            aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw,
+            aw * bw - ax * bx - ay * by - az * bz,
+        )
+
+        camera_pos: Vec3 = (
+            parent_pos[0] + offset_world[0],
+            parent_pos[1] + offset_world[1],
+            parent_pos[2] + offset_world[2],
+        )
+
+        self._apply_camera_pose(binding, camera_pos, camera_quat)
+
+    def _apply_look_at_op(
+        self,
+        op: LookAtOp,
+        resolver: MujocoRefResolver,
+        sampler: ResetSampler,
+    ) -> None:
+        entity_id = op.entity.entity_id
+
+        if entity_id not in self._camera_bindings:
+            raise SimulacBaseError("LookAtOp currently supports camera entities")
+
+        binding = self._camera_bindings[entity_id]
+
+        target = resolver.resolve_point(sampler.sample(op.target))
+        offset: Vec3 = sampler.sample(op.offset)
+
+        current_pos = self._require_data().xpos[binding.root_body_id]
+        camera_pos = (
+            float(current_pos[0]) + float(offset[0]),
+            float(current_pos[1]) + float(offset[1]),
+            float(current_pos[2]) + float(offset[2]),
+        )
+
+        quat = self._look_at_quat(
+            eye=camera_pos,
+            target=(float(target[0]), float(target[1]), float(target[2])),
+            up=sampler.sample(op.up),
+        )
+
+        self._apply_camera_pose(binding, camera_pos, quat)
+
+    def _apply_follow_op(self, op: FollowOp, resolver: MujocoRefResolver) -> None:
+        entity_id = op.entity.entity_id
+
+        if entity_id not in self._camera_bindings:
+            raise SimulacBaseError("FollowOp currently supports camera entities")
+
+        binding = self._camera_bindings[entity_id]
+
+        target_pos, target_quat = resolver.resolve_frame(op.target)
+
+        offset = op.offset
+        offset_vec = (
+            float(offset[0]),
+            float(offset[1]),
+            float(offset[2]),
+        )
+
+        if op.frame == "local":
+            x, y, z, w = target_quat
+            vx, vy, vz = offset_vec
+            # q * v * q^-1
+            tx = 2.0 * (y * vz - z * vy)
+            ty = 2.0 * (z * vx - x * vz)
+            tz = 2.0 * (x * vy - y * vx)
+            offset_world = (
+                vx + w * tx + (y * tz - z * ty),
+                vy + w * ty + (z * tx - x * tz),
+                vz + w * tz + (x * ty - y * tx),
+            )
+        elif op.frame == "world":
+            offset_world = offset_vec
+        else:
+            raise SimulacBaseError(f"Unsupported follow frame: {op.frame}")
+
+        camera_pos = (
+            target_pos[0] + offset_world[0],
+            target_pos[1] + offset_world[1],
+            target_pos[2] + offset_world[2],
+        )
+
+        self._apply_camera_pose(binding, camera_pos, target_quat)
+
+    def _apply_follow_ops(self, resolver: MujocoRefResolver) -> None:
+        if not self._follow_ops:
+            return
+        for op in self._follow_ops:
+            self._apply_follow_op(op, resolver)
+
+        mujoco.mj_forward(self.mj_model, self._require_data())
+
+    def _look_at_quat(
+        self,
+        eye: tuple[float, float, float],
+        target: tuple[float, float, float],
+        up: tuple[float, float, float],
+    ) -> tuple[float, float, float, float]:
+        # https://graphicscompendium.com/opengl/18-lookat-matrix
+
+        # f of Forward.
+        # Camera local -Z points forward.
+        fx = target[0] - eye[0]
+        fy = target[1] - eye[1]
+        fz = target[2] - eye[2]
+
+        flen = max((fx * fx + fy * fy + fz * fz) ** 0.5, 1e-9)
+        fx, fy, fz = fx / flen, fy / flen, fz / flen
+
+        ux, uy, uz = float(up[0]), float(up[1]), float(up[2])
+        ulen = max((ux * ux + uy * uy + uz * uz) ** 0.5, 1e-9)
+        ux, uy, uz = ux / ulen, uy / ulen, uz / ulen
+
+        # r of Right
+        # right = forward x up
+        rx = fy * uz - fz * uy
+        ry = fz * ux - fx * uz
+        rz = fx * uy - fy * ux
+
+        rlen = max((rx * rx + ry * ry + rz * rz) ** 0.5, 1e-9)
+        rx, ry, rz = rx / rlen, ry / rlen, rz / rlen
+
+        # u of Up
+        # corrected up = right x forward
+        ux = ry * fz - rz * fy
+        uy = rz * fx - rx * fz
+        uz = rx * fy - ry * fx
+
+        # columns: local X=right, local Y=up, local Z=-forward
+        xmat = [
+            rx,
+            ux,
+            -fx,
+            ry,
+            uy,
+            -fy,
+            rz,
+            uz,
+            -fz,
+        ]
+        return self._mat_to_quat_xyzw_from_values(xmat)
+
+    def _mat_to_quat_xyzw_from_values(
+        self,
+        xmat: list[float] | tuple[float, ...],
+    ) -> tuple[float, float, float, float]:
+        # https://github.com/google-deepmind/mujoco/blob/5ee8bd7b9c3147f1094816882903e741e53c26bf/src/engine/engine_util_spatial.c#L187
+        m00, m01, m02 = float(xmat[0]), float(xmat[1]), float(xmat[2])
+        m10, m11, m12 = float(xmat[3]), float(xmat[4]), float(xmat[5])
+        m20, m21, m22 = float(xmat[6]), float(xmat[7]), float(xmat[8])
+
+        trace = m00 + m11 + m22
+
+        if trace > 0.0:
+            s = (trace + 1.0) ** 0.5 * 2.0
+            qw = 0.25 * s
+            qx = (m21 - m12) / s
+            qy = (m02 - m20) / s
+            qz = (m10 - m01) / s
+        elif m00 > m11 and m00 > m22:
+            s = (1.0 + m00 - m11 - m22) ** 0.5 * 2.0
+            qw = (m21 - m12) / s
+            qx = 0.25 * s
+            qy = (m01 + m10) / s
+            qz = (m02 + m20) / s
+        elif m11 > m22:
+            s = (1.0 + m11 - m00 - m22) ** 0.5 * 2.0
+            qw = (m02 - m20) / s
+            qx = (m01 + m10) / s
+            qy = 0.25 * s
+            qz = (m12 + m21) / s
+        else:
+            s = (1.0 + m22 - m00 - m11) ** 0.5 * 2.0
+            qw = (m10 - m01) / s
+            qx = (m02 + m20) / s
+            qy = (m12 + m21) / s
+            qz = 0.25 * s
+
+        norm = max((qx * qx + qy * qy + qz * qz + qw * qw) ** 0.5, 1e-9)
+
+        return (
+            qx / norm,
+            qy / norm,
+            qz / norm,
+            qw / norm,
+        )
+
+    def _apply_camera_pose(
+        self,
+        binding: MujocoCameraBinding,
+        pos: tuple[float, float, float] | None,
+        quat: tuple[float, float, float, float] | None,
+    ) -> None:
+        if pos is not None:
+            self.mj_model.body_pos[binding.root_body_id] = (
+                float(pos[0]),
+                float(pos[1]),
+                float(pos[2]),
+            )
+
+        if quat is not None:
+            self.mj_model.body_quat[binding.root_body_id] = (
+                float(quat[3]),
+                float(quat[0]),
+                float(quat[1]),
+                float(quat[2]),
+            )
+
     def _apply_root_pose(
         self,
         binding: MujocoStuffBinding | MujocoRobotBinding,
@@ -616,6 +874,19 @@ class MujocoRunner(IRunner):
             self.mj_model.dof_damping[dadr : dadr + qvel_dim] = [damping] * qvel_dim
             return
 
+        if isinstance(op, AttachOp):
+            self._apply_attach_op(op, resolver, sampler)
+            return
+
+        if isinstance(op, LookAtOp):
+            self._apply_look_at_op(op, resolver, sampler)
+            return
+
+        if isinstance(op, FollowOp):
+            self._follow_ops.append(op)
+            self._apply_follow_op(op, resolver=resolver)
+            return
+
         raise SimulacBaseError(f"Unsupported build op: {type(op).__name__}")
 
     def _named_id(
@@ -715,6 +986,7 @@ class MujocoRunner(IRunner):
             if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
                 return False
         return True
+
 
 class MujocoAdapter(IPhysicsEngineAdapter):
     """_summary_
