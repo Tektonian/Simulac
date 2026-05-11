@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
+from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
 
 from .entity import ActionT
@@ -17,7 +18,13 @@ from .object import (
 )
 
 if TYPE_CHECKING:
-    from simulac.sdk.runner_service.common.model.object import (
+    from simulac.sdk.runner_service.common.model.runtime import (
+        CameraRuntime as SDKCameraRuntime,
+    )
+    from simulac.sdk.runner_service.common.model.runtime import (
+        RobotRuntime as SDKRobotRuntime,
+    )
+    from simulac.sdk.runner_service.common.model.runtime import (
         StuffRuntime as SDKStuffRuntime,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
@@ -35,14 +42,17 @@ class StuffRuntime:
             raise SimulacBaseError("Please do not create stuff object directly")
         self._runtime = runtime_object
 
-    def change_mass(self, mass: float) -> None: ...
+    def change_mass(self, mass: float) -> None:
+        self._runtime.change_mass(mass)
+
     def change_pos(self, pos: Vec3) -> None:
         self._runtime.change_pos(pos)
 
-    def change_size(self, size: Vec3) -> None: ...
-    def change_fixed(self, is_fixed: bool) -> None: ...
-    def change_friction(self, friction: float) -> None: ...
-    def change_density(self, density: float) -> None: ...
+    def change_rot(self, rot: Vec3) -> None:
+        self._runtime.change_quat(euler_to_quat(*rot))
+
+    def change_friction(self, friction: float) -> None:
+        self._runtime.change_friction(friction)
 
     def joint(self, name: str) -> None:
         """Runtime joint control
