@@ -202,6 +202,7 @@ class MujocoRunner(IRunner):
         self.state = {}
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
+        self.resolver: MujocoRefResolver | None = None
 
         self.__MAX_RESET_RETRY = 100
         self.__reset_passed = False
@@ -333,7 +334,6 @@ class MujocoRunner(IRunner):
                 binding,
                 on_after_step=lambda: self.on_after_call_step(self.runner_id),
             )
-
             robot_runtime = RobotRuntime(eid, ops)
             self._runtimes[eid] = robot_runtime
         for eid, binding in self._camera_bindings.items():
@@ -347,7 +347,7 @@ class MujocoRunner(IRunner):
         self, candidate: dict[str, dict[str, Any]], sampler: ResetSampler
     ) -> None:
         data = self._require_data()
-        resolver = MujocoRefResolver(
+        self.resolver = MujocoRefResolver(
             self.mj_model,
             data,
             stuff_bindings=self._stuff_bindings,
@@ -359,7 +359,7 @@ class MujocoRunner(IRunner):
             binding = self._entity_binding(eid)
             pos = values.get("pos")
             if isinstance(pos, RefBase):
-                pos = resolver.resolve_point(sampler.sample(pos))
+                pos = self.resolver.resolve_point(sampler.sample(pos))
 
             rot = values.get("rot")
             quat = None
@@ -396,7 +396,7 @@ class MujocoRunner(IRunner):
                 if placeop.entity.entity_id == eid
             ]
             for op in ops:
-                self._apply_build_op(eid, op, resolver, sampler)
+                self._apply_build_op(eid, op, self.resolver, sampler)
                 mujoco.mj_forward(self.mj_model, data)
 
     def _entity_binding(
