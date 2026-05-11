@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import mujoco
 
 from simulac.base.error.error import SimulacBaseError
-from simulac.sdk.runner_service.common.model.runtime import IStuffRuntimeOps
+from simulac.sdk.runner_service.common.model.runtime import (
+    ICameraRuntimeOps,
+    ILightRuntimeOps,
+    IRobotRuntimeOps,
+    IStuffRuntimeOps,
+)
 
 if TYPE_CHECKING:
     import mujoco
 
-    from .binding import MujocoRobotBinding, MujocoStuffBinding
+    from .binding import MujocoCameraBinding, MujocoRobotBinding, MujocoStuffBinding
 
 
 def _wxyz_to_xyzw(quat: tuple[float, float, float, float]) -> list[float]:
@@ -311,4 +316,58 @@ class MujocoRobotRuntimeOps(IRobotRuntimeOps):
         if joint_type == mujoco.mjtJoint.mjJNT_BALL:
             return 4, 3
         return 1, 1
+
+
+class MujocoCameraRuntimeOps(ICameraRuntimeOps):
+    def __init__(
+        self,
+        entity_id: str,
+        model: mujoco.MjModel,
+        data: mujoco.MjData,
+        binding: MujocoCameraBinding,
+    ) -> None:
+        self.id = entity_id
+        self._model = model
+        self._data = data
+        self._binding = binding
+
+    def get_pos(self) -> tuple[float, float, float]:
+        pos = self._data.xpos[self._binding.root_body_id]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        quat_wxyz = self._data.xquat[self._binding.root_body_id]
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def change_pos(self, pos: tuple[float, float, float]) -> None:
+        self._model.body_pos[self._binding.root_body_id] = (
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        )
+        mujoco.mj_forward(self._model, self._data)
+
+    def change_quat(self, quat: tuple[float, float, float, float]) -> None:
+        self._model.body_quat[self._binding.root_body_id] = (
+            float(quat[3]),
+            float(quat[0]),
+            float(quat[1]),
+            float(quat[2]),
+        )
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_fov(self) -> float:
+        return float(self._model.cam_fovy[self._binding.camera_id])
+
+    def change_fov(self, fov: float) -> None:
+        if fov <= 0:
+            raise SimulacBaseError("camera fov must be positive")
+
+        self._model.cam_fovy[self._binding.camera_id] = float(fov)
+        mujoco.mj_forward(self._model, self._data)
 
