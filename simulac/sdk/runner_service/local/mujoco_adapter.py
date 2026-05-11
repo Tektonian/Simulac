@@ -246,9 +246,36 @@ class MujocoRunner(IRunner):
 
         raise SimulacBaseError(f"There is no runtime object id '{entity_id}'")
 
+    def snapshot(self): ...
+    def _native_snapshot(self, camera_id: str, *, width: int = 640, height: int = 480):
+        data = self._require_data()
+        binding = self._camera_bindings.get(camera_id)
+        if binding is None:
+            raise SimulacBaseError(f"No camera named {camera_id!r}")
+
+        entity = self._camera_entities[camera_id]
+
+        # self._apply_follow_ops()
+
+        renderer = mujoco.Renderer(self.mj_model, height=height, width=width)
+        try:
+            if entity.spec.type == "depth":
+                renderer.enable_depth_rendering()
+                renderer.update_scene(data, camera=binding.camera_id)
+                return renderer.render().copy()
+
+            if entity.spec.type == "segmentation":
+                renderer.enable_segmentation_rendering()
+                renderer.update_scene(data, camera=binding.camera_id)
+                return renderer.render().copy()
+
+            renderer.update_scene(data, camera=binding.camera_id)
+            return renderer.render().copy()
+        finally:
+            renderer.close()
+
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
-    def render(self) -> None: ...
     def reset(self, seed: int | None = 0) -> None:
         data = self._require_data()
         sampler = ResetSampler(seed)

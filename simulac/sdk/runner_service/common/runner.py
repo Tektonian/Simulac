@@ -45,8 +45,10 @@ class IRunner(ABC):
     def clone_state(self) -> None: ...
 
     @abstractmethod
-    def render(self) -> None:
-        pass
+    def snapshot(self) -> None:
+        """Take a snapshot (like a screenshot).
+        This is for future use, when we implemented web browser renderer
+        """
 
     @abstractmethod
     def _debug_render(self) -> Any:
