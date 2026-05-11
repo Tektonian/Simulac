@@ -6,15 +6,24 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
 from simulac.sdk.environment_service.common.model.ref import (
     AnchorRef,
+    AttachOp,
+    CameraRef,
     ColliderRef,
     EntityRef,
+    FollowOp,
     JointRef,
+    LookAtOp,
     PlaceOp,
+    SetCameraFovOp,
+    SetCameraPosOp,
+    SetCameraRotOp,
+    WorldPointRef,
     as_place_source,
     as_place_target,
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.environment_service.common.environment import IEnvironment
     from simulac.sdk.environment_service.common.model.entity import (
         EnvironmentCameraEntity,
         EnvironmentLightEntity,
@@ -171,7 +180,9 @@ class Environment:
             self._world_maker.add_entity(
                 self._env.id, env_camera_obj, entity_id, pos=pos, rot=rot
             )
-            return CameraObject(env_camera_obj, _create_sentinal=_CREATE_SENTINAL)
+            return CameraObject(
+                env_camera_obj, _create_sentinal=_CREATE_SENTINAL, env=self._env
+            )
         else:
             env_light_obj = self._world_maker.create_light_entity(
                 entity._to_spec(), description=description
@@ -240,7 +251,23 @@ class Environment:
 
     def get_object(
         self, object_id: str
-    ) -> StuffObject | RobotObject[Any] | CameraObject | LightObject: ...
+    ) -> StuffObject | RobotObject[Any] | CameraObject | LightObject | None:
+        env = self._env
+        for obj in env.stuffs:
+            if obj.id == object_id:
+                return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL)
+        for obj in env.machines:
+            if obj.id == object_id:
+                return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL)
+        for obj in env.lights:
+            if obj.id == object_id:
+                return LightObject(obj, _create_sentinal=_CREATE_SENTINAL)
+        for obj in env.cameras:
+            if obj.id == object_id:
+                return CameraObject(
+                    obj, _create_sentinal=_CREATE_SENTINAL, env=self._env
+                )
+        return None
 
     def dump_env(self) -> dict:
         """Return definition of environment.
@@ -429,17 +456,31 @@ class CameraObject:
         /,
         *,
         _create_sentinal: object,
+        env: IEnvironment,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
         self._entity = entity
+        self._env = env
 
-    def set_pos(self, pos: RandomizableVec3) -> None: ...
-    def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_fov(self, fov: RandomizableFloat) -> None: ...
-    def set_aspect(self, aspect: RandomizableFloat) -> None: ...
-    def set_near(self, near: RandomizableFloat) -> None: ...
-    def set_far(self, far: RandomizableFloat) -> None: ...
+    def set_pos(self, pos: RandomizableVec3) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+        self._env.relations.append(SetCameraPosOp(CameraRef(self._entity.id), pos))
+
+    def set_rot(self, rot: RandomizableVec3) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+        self._env.relations.append(SetCameraRotOp(CameraRef(self._entity.id), rot))
+
+    def set_fov(self, fov: RandomizableFloat) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+        self._env.relations.append(SetCameraFovOp(CameraRef(self._entity.id), fov))
+
+    def _set_aspect(self, aspect: RandomizableFloat) -> None: ...
+    def _set_near(self, near: RandomizableFloat) -> None: ...
+    def _set_far(self, far: RandomizableFloat) -> None: ...
 
     def set_type(
         self,
@@ -457,24 +498,69 @@ class CameraObject:
         self,
         target: Vec3 | AnchorRef | ColliderRef,
         *,
-        up: Vec3,
-        offset: RandomizableVec3,
-    ) -> None: ...
+        up: Vec3 = (0, 0, 1),
+        offset: RandomizableVec3 = (0, 0, 0),
+    ) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+
+        target_ref = target
+        if isinstance(target, tuple):
+            target_ref = WorldPointRef(target)
+
+        self._env.relations.append(
+            LookAtOp(
+                EntityRef(self._entity.id),
+                as_place_target(target_ref),
+                up=up,
+                offset=offset,
+            )
+        )
 
     def attach_to(
         self,
         parent: AnchorRef,
         *,
-        offset: RandomizableVec3,
-        rot: RandomizableVec3,
-    ) -> None: ...
+        offset: RandomizableVec3 = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
+    ) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+
+        self._env.relations.append(
+            AttachOp(
+                EntityRef(self._entity.id),
+                parent,
+                offset=offset,
+                rot=rot,
+            )
+        )
+
     def follow(
         self,
         target: AnchorRef | ColliderRef | RobotObject[Any] | StuffObject,
         *,
-        offset: RandomizableVec3,
-        frame: Literal["world", "local"],
-    ): ...
+        offset: RandomizableVec3 = (0, 0, 0),
+        frame: Literal["world", "local"] = "world",
+    ) -> None:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+
+        if isinstance(target, (RobotObject, StuffObject)):
+            if target._entity.id is None:
+                raise SimulacBaseError("Follow target entity must be added first")
+            target_ref = EntityRef(target._entity.id)
+        else:
+            target_ref = target
+
+        self._env.relations.append(
+            FollowOp(
+                EntityRef(self._entity.id),
+                target_ref,
+                offset=offset,
+                frame=frame,
+            )
+        )
 
 
 class LightObject:

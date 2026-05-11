@@ -115,19 +115,35 @@ class RobotRuntime(Generic[ActionT]):
 class CameraRuntime:
     def __init__(
         self,
+        runtime_object: SDKCameraRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create runtime camera directly")
+        self._runtime = runtime_object
 
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_rot(self, rot: Vec3) -> None: ...
+    def get_pos(self) -> Vec3:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def change_pos(self, pos: Vec3) -> None:
+        self._runtime.change_pos(pos)
+
+    def change_rot(self, rot: Vec3) -> None:
+        self._runtime.change_quat(euler_to_quat(*rot))
+
+    def get_fov(self) -> float:
+        return self._runtime.get_fov()
+
     def change_fov(self, fov: float) -> None:
         """for zoom mocking
         Needed?
         """
+        self._runtime.change_fov(fov)
 
 
 class LightRuntime:
