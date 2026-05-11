@@ -18,16 +18,20 @@ import mujoco
 import mujoco.viewer
 
 from simulac.base.error.error import SimulacBaseError
-from simulac.base.types.geometry import Vec3
+from simulac.base.types.geometry import Quat, Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk.environment_service.common.model.ref import (
     AnchorPosRef,
     AnchorRef,
+    AttachOp,
     BuildOpBase,
+    CameraRef,
     ColliderCenterRef,
     ColliderRef,
+    FollowOp,
     JointAxisRef,
     JointRef,
+    LookAtOp,
     PlaceOp,
     PointRefBase,
     RefBase,
@@ -50,7 +54,11 @@ from simulac.sdk.environment_service.common.randomize import (
     NormalRandomSpec,
     UniformRandomSpec,
 )
-from simulac.sdk.runner_service.common.model.runtime import RobotRuntime, StuffRuntime
+from simulac.sdk.runner_service.common.model.runtime import (
+    CameraRuntime,
+    RobotRuntime,
+    StuffRuntime,
+)
 from simulac.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
@@ -60,12 +68,14 @@ from simulac.sdk.runner_service.common.runner_service import IRunnerManagementSe
 from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoActuatorBinding,
+    MujocoCameraBinding,
     MujocoJointBinding,
     MujocoLinkBinding,
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
 from simulac.sdk.runner_service.local.mujoco.runtime import (
+    MujocoCameraRuntimeOps,
     MujocoRobotRuntimeOps,
     MujocoStuffRuntimeOps,
 )
@@ -78,6 +88,7 @@ if TYPE_CHECKING:
         IEnvironmentManagementService,
     )
     from simulac.sdk.environment_service.common.model.entity import (
+        EnvironmentCameraEntity,
         EnvironmentMachineEntity,
         EnvironmentStuffEntity,
     )
@@ -170,7 +181,9 @@ class MujocoRunner(IRunner):
         mj_model: mujoco.MjModel,
         stuff_entities: dict[str, EnvironmentStuffEntity],
         machine_entities: dict[str, EnvironmentMachineEntity],
+        camera_entities: dict[str, EnvironmentCameraEntity],
         stuff_bindings: dict[str, MujocoStuffBinding],
+        camera_bindins: dict[str, MujocoCameraBinding],
         machine_bindings: dict[str, MujocoRobotBinding],
         on_after_call_step: Callable[[str], None],
     ) -> None:
@@ -180,9 +193,12 @@ class MujocoRunner(IRunner):
         self.mj_model = mj_model
         self._stuff_entities = stuff_entities
         self._machine_entities = machine_entities
+        self._camera_entities = camera_entities
         self._stuff_bindings = stuff_bindings
         self._machine_bindings = machine_bindings
-        self._runtimes = dict[str, StuffRuntime | RobotRuntime]()
+        self._camera_bindings = camera_bindins
+        self._runtimes = dict[str, StuffRuntime | RobotRuntime | CameraRuntime]()
+        self._follow_ops: list[FollowOp] = []
         self.state = {}
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
@@ -209,10 +225,12 @@ class MujocoRunner(IRunner):
             )
         data.ctrl[:] = action
         mujoco.mj_step(self.mj_model, data)
+        self._apply_follow_ops(self.resolver)
         self.on_after_call_step(self.runner_id)
 
     def tick(self) -> None:
         mujoco.mj_step(self.mj_model, self._require_data())
+        self._apply_follow_ops(self.resolver)
 
     # FIXME: debug purpose for now. Should return state info mapped with self._env
     def get_state(self) -> None:
@@ -284,6 +302,16 @@ class MujocoRunner(IRunner):
                     "rot": sampler.constraints(entity.rot),
                 },
             }
+
+        for eid, entity in self._camera_entities.items():
+            candidate[eid] = {
+                "pos": sampler.sample(entity.pos),
+                "rot": sampler.sample(entity.rot),
+                "constraints": {
+                    "pos": sampler.constraints(entity.pos),
+                    "rot": sampler.constraints(entity.rot),
+                },
+            }
         return candidate
 
     def _clean_runtimes(self) -> None:
@@ -308,6 +336,12 @@ class MujocoRunner(IRunner):
 
             robot_runtime = RobotRuntime(eid, ops)
             self._runtimes[eid] = robot_runtime
+        for eid, binding in self._camera_bindings.items():
+            ops = MujocoCameraRuntimeOps(
+                eid, self.mj_model, self._require_data(), binding
+            )
+            camera_runtime = CameraRuntime(eid, ops)
+            self._runtimes[eid] = camera_runtime
 
     def _apply_candidate(
         self, candidate: dict[str, dict[str, Any]], sampler: ResetSampler
@@ -318,6 +352,7 @@ class MujocoRunner(IRunner):
             data,
             stuff_bindings=self._stuff_bindings,
             machine_bindings=self._machine_bindings,
+            camera_bindings=self._camera_bindings,
         )
 
         for eid, values in candidate.items():
@@ -330,6 +365,10 @@ class MujocoRunner(IRunner):
             quat = None
             if rot is not None and not isinstance(rot, RefBase):
                 quat = euler_to_quat(*rot)
+
+            if eid in self._camera_bindings:
+                self._apply_camera_pose(self._camera_bindings[eid], pos, quat)
+                continue
 
             self._apply_root_pose(binding, pos, quat)
 
@@ -363,7 +402,7 @@ class MujocoRunner(IRunner):
     def _entity_binding(
         self,
         entity_id: str,
-    ) -> MujocoStuffBinding | MujocoRobotBinding:
+    ) -> MujocoStuffBinding | MujocoRobotBinding | MujocoCameraBinding:
         binding = self._stuff_bindings.get(entity_id)
         if binding is not None:
             return binding
@@ -372,6 +411,9 @@ class MujocoRunner(IRunner):
         if binding is not None:
             return binding
 
+        binding = self._camera_bindings.get(entity_id)
+        if binding is not None:
+            return binding
         raise SimulacBaseError(f"No MuJoCo binding for entity {entity_id!r}")
 
     def _apply_root_pose(
@@ -706,6 +748,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         self.data: mujoco.MjData | None = None
         self._stuff_bindings: dict[str, MujocoStuffBinding] = {}
         self._machine_bindings: dict[str, MujocoRobotBinding] = {}
+        self._camera_bindings: dict[str, MujocoCameraBinding] = {}
 
         env_ret = self.EnvironmentManagementService.get_environment(self.env_id)
 
@@ -717,11 +760,13 @@ class MujocoAdapter(IPhysicsEngineAdapter):
 
         self._stuff_entities = {e.id: e for e in env.stuffs if e.id is not None}
         self._machine_entities = {e.id: e for e in env.machines if e.id is not None}
-
+        self._camera_entities = {e.id: e for e in env.cameras if e.id is not None}
         for stuff in env.stuffs:
             self.__add_stuff(stuff)
         for machine in env.machines:
             self.__add_machine(machine)
+        for camera in env.cameras:
+            self.__add_camera(camera)
         """
         TODO: @gangjeuk
             1. implement mujoco parallel
@@ -737,6 +782,8 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             self._machine_bindings[machine.id] = self.__build_machine_binding(
                 machine.id,
             )
+        for camera in env.cameras:
+            self._camera_bindings[camera.id] = self.__build_camera_binding(camera.id)
 
     def create_runner(self) -> IRunner:
         if self._step_count != 0:
@@ -758,9 +805,11 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             self.env,
             mj_model=self.model,
             stuff_entities=self._stuff_entities,
+            camera_entities=self._camera_entities,
             machine_entities=self._machine_entities,
             stuff_bindings=self._stuff_bindings,
             machine_bindings=self._machine_bindings,
+            camera_bindins=self._camera_bindings,
             on_after_call_step=on_after_runner_step,
         )
 
@@ -809,6 +858,31 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         self.__prepare_child_root(child, machine.id, add_freejoint=False)
         self.root_spec.attach(
             child, frame=self.root_frame, prefix=f"{machine.id}/", suffix=""
+        )
+
+    def __add_camera(self, camera: EnvironmentCameraEntity) -> None:
+        """add camera as mujoco.mjSpec
+
+        If works like adding entity below
+        ```xml
+        <body name="front_rgb/__root__" pos="0 0 0">
+            <camera name="front_rgb/__root__camera" pos="0 0 0" quat="1 0 0 0" fovy="45"/>
+        </body>
+        ```
+        """
+        if camera.id is None:
+            raise SimulacBaseError("Camera entity id is required")
+
+        body = self.root_spec.worldbody.add_body(
+            name=f"{camera.id}/__root__",
+            pos=(0.0, 0.0, 0.0),
+        )
+
+        body.add_camera(
+            name=f"{camera.id}/__root__camera",
+            pos=(0.0, 0.0, 0.0),
+            quat=(1.0, 0.0, 0.0, 0.0),
+            fovy=float(camera.spec.fov),
         )
 
     def __actuator_target(
@@ -1100,5 +1174,39 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             joint_ids=joint_ids,
             actuator_ids=actuator_ids,
             root_freejoint_id=root_freejoint_id,
+            mocap_id=int(self.model.body_mocapid[root_body_id]),
+        )
+
+    def __build_camera_binding(self, entity_id: str) -> MujocoCameraBinding:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        root_body_full_name = f"{entity_id}/__root__"
+        camera_full_name = f"{entity_id}/__root__camera"
+
+        root_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            root_body_full_name,
+        )
+        if root_body_id < 0:
+            raise SimulacBaseError(f"No MuJoCo camera root body for {entity_id!r}")
+
+        camera_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_CAMERA,
+            camera_full_name,
+        )
+        if camera_id < 0:
+            raise SimulacBaseError(f"No MuJoCo camera for {entity_id!r}")
+
+        return MujocoCameraBinding(
+            entity_id=entity_id,
+            root_body_id=root_body_id,
+            root_body_name="__root__",
+            root_body_full_name=root_body_full_name,
+            camera_id=camera_id,
+            camera_name="__root__camera",
+            camera_full_name=camera_full_name,
             mocap_id=int(self.model.body_mocapid[root_body_id]),
         )
