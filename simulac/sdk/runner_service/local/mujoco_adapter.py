@@ -50,7 +50,7 @@ from simulac.sdk.environment_service.common.randomize import (
     NormalRandomSpec,
     UniformRandomSpec,
 )
-from simulac.sdk.runner_service.common.model.runtime import StuffRuntime
+from simulac.sdk.runner_service.common.model.runtime import RobotRuntime, StuffRuntime
 from simulac.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
     IPhysicsEngineAdapterState,
@@ -182,7 +182,7 @@ class MujocoRunner(IRunner):
         self._machine_entities = machine_entities
         self._stuff_bindings = stuff_bindings
         self._machine_bindings = machine_bindings
-        self._stuff_runtimes = dict[str, StuffRuntime]()
+        self._runtimes = dict[str, StuffRuntime | RobotRuntime]()
         self.state = {}
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
@@ -221,8 +221,11 @@ class MujocoRunner(IRunner):
         breakpoint()
 
     def get_runtime_object(self, entity_id: str):
-        # breakpoint()
-        return self._stuff_runtimes.get(entity_id)
+        ret = self._runtimes.get(entity_id, None)
+        if ret is not None:
+            return ret
+
+        raise SimulacBaseError(f"There is no runtime object id '{entity_id}'")
 
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
@@ -231,7 +234,7 @@ class MujocoRunner(IRunner):
         data = self._require_data()
         sampler = ResetSampler(seed)
 
-        self._clean_runtime_stuff()
+        self._clean_runtimes()
 
         retry_count = 0
         while self.__reset_passed or retry_count <= self.__MAX_RESET_RETRY:
@@ -245,8 +248,10 @@ class MujocoRunner(IRunner):
             mujoco.mj_forward(self.mj_model, data)
 
             if not self._constraints_pass(candidate):
+                retry_count += 1
                 continue
-            self._create_runtime_stuff()
+
+            self._create_runtimes()
             self.__reset_passed = True
             return
         raise SimulacBaseError("Failed to sample valid reset state")
@@ -281,17 +286,28 @@ class MujocoRunner(IRunner):
             }
         return candidate
 
-    def _clean_runtime_stuff(self) -> None:
-        self._stuff_runtimes: dict[str, StuffRuntime] = dict()
+    def _clean_runtimes(self) -> None:
+        self._runtimes: dict[str, StuffRuntime | RobotRuntime] = dict()
 
-    def _create_runtime_stuff(self) -> None:
+    def _create_runtimes(self) -> None:
         for eid, binding in self._stuff_bindings.items():
             ops = MujocoStuffRuntimeOps(
                 eid, self.mj_model, self._require_data(), binding
             )
 
             stuff_runtime = StuffRuntime(eid, ops)
-            self._stuff_runtimes[eid] = stuff_runtime
+            self._runtimes[eid] = stuff_runtime
+        for eid, binding in self._machine_bindings.items():
+            ops = MujocoRobotRuntimeOps(
+                eid,
+                self.mj_model,
+                self._require_data(),
+                binding,
+                on_after_step=lambda: self.on_after_call_step(self.runner_id),
+            )
+
+            robot_runtime = RobotRuntime(eid, ops)
+            self._runtimes[eid] = robot_runtime
 
     def _apply_candidate(
         self, candidate: dict[str, dict[str, Any]], sampler: ResetSampler
