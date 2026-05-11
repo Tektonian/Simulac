@@ -65,7 +65,10 @@ from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
-from simulac.sdk.runner_service.local.mujoco.runtime import MujocoStuffRuntimeOps
+from simulac.sdk.runner_service.local.mujoco.runtime import (
+    MujocoRobotRuntimeOps,
+    MujocoStuffRuntimeOps,
+)
 
 from .mujoco.resolver import MujocoRefResolver
 
