@@ -292,9 +292,23 @@ class Runner:
     def get_runtime_object(
         self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
     ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime:
-
+        if obj._entity.id is None:
+            raise SimulacBaseError("Entity should be added before runtime initialized")
         runtime_object = self._runner.get_runtime_object(obj._entity.id)
-        return StuffRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, StuffObject):
+            return StuffRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, RobotObject):
+            return RobotRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, LightObject):
+            return LightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, CameraObject):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return CameraRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        raise SimulacBaseError(f"Unsupported runtime object: {type(obj).__name__}")
 
     def close(self) -> None: ...
 
