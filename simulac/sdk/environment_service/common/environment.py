@@ -14,6 +14,7 @@ from simulac.sdk.environment_service.common.model.entity import (
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.environment_service.common.model.constraint import SceneConstraint
     from simulac.sdk.environment_service.common.model.ref import BuildOpType
 
 
@@ -45,7 +46,7 @@ class IEnvironment(ABC):
     machines: list[EnvironmentMachineEntity] = field(default_factory=list)
 
     relations: list[BuildOpType] = field(default_factory=list)
-    constraints: list[dict[str, str]] = field(default_factory=list)
+    constraints: list[SceneConstraint] = field(default_factory=list)
 
     # region TODO: implment later
     particles: list[Any] = field(default_factory=list)
