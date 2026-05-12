@@ -177,6 +177,7 @@ def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
 class MujocoRunner(IRunner):
     def __init__(
         self,
+        LogService: ILogService,
         runner_id: str,
         env: IEnvironment,
         mj_model: mujoco.MjModel,
@@ -188,6 +189,8 @@ class MujocoRunner(IRunner):
         machine_bindings: dict[str, MujocoRobotBinding],
         on_after_call_step: Callable[[str], None],
     ) -> None:
+        self.LogService = LogService
+
         self.runner_type = "mujoco"
         self.runner_id = runner_id
         self.env = env
@@ -205,7 +208,7 @@ class MujocoRunner(IRunner):
         self._data: mujoco.MjData | None = None
         self.resolver: MujocoRefResolver | None = None
 
-        self.__MAX_RESET_RETRY = 100
+        self.__MAX_RESET_RETRY = 1000
         self.__reset_passed = False
 
     def initialize(self) -> None:
@@ -284,7 +287,9 @@ class MujocoRunner(IRunner):
         self._clean_runtimes()
 
         retry_count = 0
-        while self.__reset_passed or retry_count <= self.__MAX_RESET_RETRY:
+
+        max_retry = None if self.__reset_passed else self.__MAX_RESET_RETRY
+        while max_retry is None or retry_count <= self.__MAX_RESET_RETRY:
             candidate = self._sampling_candidate(sampler)
 
             mujoco.mj_resetData(self.mj_model, data)
@@ -295,6 +300,10 @@ class MujocoRunner(IRunner):
             mujoco.mj_forward(self.mj_model, data)
 
             if not self._constraints_pass():
+                if retry_count == 100:
+                    self.LogService.warn(
+                        f"Reset count Runner {self.runner_id} / Environment {self.env.id} enreached 100 counts. Please check your environment setting once again"
+                    )
                 retry_count += 1
                 continue
 
@@ -1030,8 +1039,9 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         new_runner_id = f"run_{self._runner_count}"
 
         runner = MujocoRunner(
-            new_runner_id,
-            self.env,
+            LogService=self.LogService,
+            runner_id=new_runner_id,
+            env=self.env,
             mj_model=self.model,
             stuff_entities=self._stuff_entities,
             camera_entities=self._camera_entities,
