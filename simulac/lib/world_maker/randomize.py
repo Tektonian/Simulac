@@ -28,11 +28,8 @@ class Constraint:
     """Helpers for building typed constraint specs."""
 
     @staticmethod
-    def __nonpenetration(*between: str) -> NonpenetrationConstraintSpec:
-        """Prevent penetration between named objects.
-        TODO: @gangjeuk
-        How to check?
-        """
+    def nonpenetration(*between: str) -> NonpenetrationConstraintSpec:
+        """Prevent penetration between named objects."""
         return {"type": "nonpenetration", "between": list(between)}
 
     @staticmethod
