@@ -81,6 +81,7 @@ from simulac.sdk.runner_service.local.mujoco.runtime import (
 )
 
 from .mujoco.resolver import MujocoRefResolver
+from .mujoco.constraint import MujocoConstraintEvaluator
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -293,7 +294,7 @@ class MujocoRunner(IRunner):
             mujoco.mj_setConst(self.mj_model, data)
             mujoco.mj_forward(self.mj_model, data)
 
-            if not self._constraints_pass(candidate):
+            if not self._constraints_pass():
                 retry_count += 1
                 continue
 
@@ -930,89 +931,18 @@ class MujocoRunner(IRunner):
 
         return obj_id
 
-    def _constraints_pass(self, candidate: dict[str, dict[str, Any]]) -> bool:
-        for eid, values in candidate.items():
-            for c in values.get("constraints", {}).get("pos", []):
-                if not self._constraint_pass(eid, c):
-                    return False
-        return True
-
-    def _constraint_pass(self, eid: str, constraint: _ConstraintSpec) -> bool:
-        typ = constraint["type"]
-
-        if typ == "bbox":
-            return self._bbox_constraint_pass(eid, constraint)
-        if typ == "distance":
-            return self._distance_constraint_pass(constraint)
-        if typ == "nonpenetration":
-            return self._nonpenetration_constraint_pass(constraint)
-
-        raise SimulacBaseError(f"Unsupported constraint: {typ}")
-
-    def _bbox_constraint_pass(self, eid: str, constraint: BboxConstraintSpec):
-        binding = self._entity_binding(eid)
-        pos = self._require_data().xpos[binding.root_body_id]
-
-        lo = constraint["min"]
-        hi = constraint["max"]
-
-        inside = all(float(lo[i]) <= float(pos[i]) <= float(hi[i]) for i in range(3))
-
-        mode = constraint.get("mode", "inside")
-        if mode == "inside":
-            return inside
-
-        if mode == "outside":
-            return not inside
-
-        raise SimulacBaseError(f"Unsupported bbox constraint mode: {mode}")
-
-    def _distance_constraint_pass(self, constraint: DistanceConstraintSpec):
-        a, b = constraint["between"]
-
-        a_binding = self._entity_binding(a)
-        b_binding = self._entity_binding(b)
-
-        data = self._require_data()
-        pa = data.xpos[a_binding.root_body_id]
-        pb = data.xpos[b_binding.root_body_id]
-
-        dx = float(pa[0]) - float(pb[0])
-        dy = float(pa[1]) - float(pb[1])
-        dz = float(pa[2]) - float(pb[2])
-
-        distance = sqrt(dx * dx + dy * dy + dz * dz)
-
-        return float(constraint["min"]) <= distance <= float(constraint["max"])
-
-    def _nonpenetration_constraint_pass(
-        self, constraint: NonpenetrationConstraintSpec
-    ) -> bool:
-        between = constraint["between"]
-        if len(between) < 2:
-            raise SimulacBaseError(
-                "nonpenetration constraint requires at least two entities"
-            )
-
-        for idx, a in enumerate(between):
-            for b in between[idx + 1 :]:
-                if not self._nonpenetration_pair_pass(a, b):
-                    return False
-
-        return True
-
-    def _nonpenetration_pair_pass(self, a: str, b: str) -> bool:
-        data = self._require_data()
-        a_geoms = set(self._entity_binding(a).geom_ids)
-        b_geoms = set(self._entity_binding(b).geom_ids)
-        for i in range(data.ncon):
-            contact = data.contact[i]
-            if contact.dist >= -1e-5:
-                continue
-            g1, g2 = int(contact.geom1), int(contact.geom2)
-            if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
-                return False
-        return True
+    def _constraints_pass(self) -> bool:
+        evaluator = MujocoConstraintEvaluator(
+            model=self.mj_model,
+            data=self._require_data(),
+            resolver=self.resolver,
+            bindings={
+                **self._stuff_bindings,
+                **self._machine_bindings,
+                **self._camera_bindings,
+            },
+        )
+        return evaluator.passed(self.env.constraints)
 
 
 class MujocoAdapter(IPhysicsEngineAdapter):
