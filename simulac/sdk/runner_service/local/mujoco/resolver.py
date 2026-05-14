@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from math import sqrt
-from typing import Literal, cast, overload
+from typing import Any, Literal, cast, overload
 
 import mujoco
 
@@ -27,6 +27,8 @@ from simulac.sdk.environment_service.common.model.ref import (
     JointAxisRef,
     JointRef,
     LightPosRef,
+    PointRefBase,
+    PointRefType,
     RefBase,
     SupportPointRef,
     SurfaceCenterRef,
@@ -35,6 +37,7 @@ from simulac.sdk.environment_service.common.model.ref import (
     WorldPointRef,
 )
 from simulac.sdk.environment_service.common.randomize import Randomizable
+from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
     MujocoRobotBinding,
@@ -586,13 +589,47 @@ class MujocoRefResolver:
             tangent_axes = [idx for idx in range(3) if idx != axis_idx]
             local_offset = [0.0, 0.0, 0.0]
 
-            for idx in tangent_axes:
+            for axis_order, idx in enumerate(tangent_axes):
+                explicit = ref.x if axis_order == 0 else ref.y
                 span = max(float(size[idx]) - margin, 0.0)
-                local_offset[idx] = random.uniform(-span, span)
 
-            world_offset = self.__rot_local_to_world(
-                xmat, cast(Vec3, tuple(local_offset))
-            )
+                if explicit is None:
+                    local_offset[idx] = random.uniform(-span, span)
+                else:
+                    value = self.__require_concrete_float(explicit)
+                    local_offset[idx] = max(-span, min(span, value))
+
+            offset = self.__require_concrete_vec3(ref.offset)
+
+            if ref.offset_frame == "target":
+                local_offset[0] += float(offset[0])
+                local_offset[1] += float(offset[1])
+                local_offset[2] += float(offset[2])
+
+                world_offset = self.__rot_local_to_world(
+                    xmat,
+                    (
+                        float(local_offset[0]),
+                        float(local_offset[1]),
+                        float(local_offset[2]),
+                    ),
+                )
+            elif ref.offset_frame == "world":
+                world_sample_offset = self.__rot_local_to_world(
+                    xmat,
+                    (
+                        float(local_offset[0]),
+                        float(local_offset[1]),
+                        float(local_offset[2]),
+                    ),
+                )
+                world_offset = (
+                    world_sample_offset[0] + float(offset[0]),
+                    world_sample_offset[1] + float(offset[1]),
+                    world_sample_offset[2] + float(offset[2]),
+                )
+            else:
+                raise SimulacBaseError(f"Unsupported offset frame: {ref.offset_frame}")
 
             center = (
                 center[0] + world_offset[0],
