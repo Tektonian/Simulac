@@ -23,6 +23,10 @@ from simulac.sdk.runner_service.local.mujoco.resolver import MujocoRefResolver
 
 
 class MujocoConstraintEvaluator:
+    """TODO: @gangjeuk
+    add debug message, when user .reset() failed so many times
+    """
+
     def __init__(
         self,
         *,
@@ -107,61 +111,54 @@ class MujocoConstraintEvaluator:
         binding_b = self.bindings.get(b)
 
         if binding_a is None:
-            raise SimulacBaseError(f"No MuJoCo binding for entity {a!r}")
+            raise SimulacBaseError(
+                f"Unknown entity in nonpenetration constraint: {a!r}"
+            )
 
         if binding_b is None:
-            raise SimulacBaseError(f"No MuJoCo binding for entity {b!r}")
+            raise SimulacBaseError(
+                f"Unknown entity in nonpenetration constraint: {b!r}"
+            )
 
-        if not isinstance(
-            binding_a, (MujocoRobotBinding, MujocoStuffBinding)
-        ) or not isinstance(binding_b, (MujocoStuffBinding, MujocoRobotBinding)):
-            raise SimulacBaseError(f"No MuJoCo binding for entity {b!r}")
+        if not isinstance(binding_a, (MujocoStuffBinding, MujocoRobotBinding)):
+            raise SimulacBaseError(
+                f"Unsupported nonpenetration target {a!r}: "
+                f"{type(binding_a).__name__}. "
+                "Only Stuff and Robot entities can be used in nonpenetration constraints."
+            )
 
-        body_a = binding_a.root_body_id
-        body_b = binding_b.root_body_id
+        if not isinstance(binding_b, (MujocoStuffBinding, MujocoRobotBinding)):
+            raise SimulacBaseError(
+                f"Unsupported nonpenetration target {b!r}: "
+                f"{type(binding_b).__name__}. "
+                "Only Stuff and Robot entities can be used in nonpenetration constraints."
+            )
+
+        if not binding_a.geom_ids:
+            raise SimulacBaseError(
+                f"Nonpenetration target {a!r} has no geoms registered in MuJoCo binding."
+            )
+
+        if not binding_b.geom_ids:
+            raise SimulacBaseError(
+                f"Nonpenetration target {b!r} has no geoms registered in MuJoCo binding."
+            )
 
         for i in range(self.data.ncon):
             contact = self.data.contact[i]
-            # geom1_body = int(self.model.geom_bodyid[contact.geom1])
-            # geom2_body = int(self.model.geom_bodyid[contact.geom2])
 
             # pass if is too small
-            if contact.dist >= -1e-5:
+            penetration_tolerance = 1e-5
+            if contact.dist >= -1 * penetration_tolerance:
                 continue
-            a_geoms = binding_a.geom_ids
-            b_geoms = binding_b.geom_ids
+            a_geoms = set(binding_a.geom_ids)
+            b_geoms = set(binding_b.geom_ids)
             g1, g2 = int(contact.geom1), int(contact.geom2)
 
             if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
                 return False
 
-            # if (
-            #     self._is_descendant_body(geom1_body, body_a)
-            #     and self._is_descendant_body(geom2_body, body_b)
-            # ) or (
-            #     self._is_descendant_body(geom1_body, body_b)
-            #     and self._is_descendant_body(geom2_body, body_a)
-            # ):
-            #     if float(contact.dist) < 0.0:
-            #         return False
-
         return True
-
-    # def _is_descendant_body(self, child: int, parent: int) -> bool:
-    #     body = child
-    #     visited: set[int] = set()
-
-    #     while body not in visited:
-    #         if body == parent:
-    #             return True
-
-    #         visited.add(body)
-
-    #         if body == 0:
-    #             break
-    #         body = int(self.model.body_parentid[body])
-
-    #     return False
 
     def _resolve_target_point(self, target: EntityTarget | RefTarget):
         if isinstance(target, EntityTarget):
