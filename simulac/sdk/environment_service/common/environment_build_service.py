@@ -364,7 +364,7 @@ class EnvironmentBuildService(IEnvironmentBuildService):
             "type": type(entity).__name__,
             "description": entity.description,
             "pos": entity.pos,
-            "quat": entity.quat,
+            "rot": entity.rot,
         }
 
         if isinstance(entity, EnvironmentStuffEntity):
