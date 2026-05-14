@@ -178,6 +178,12 @@ def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
 
 
 class MujocoRunner(IRunner):
+    """NOTE, FIXME: @gangjeuk
+    Now usage pattern of LogService in mujoco_adapter.py and all files in /mujoco is anti-pattern.
+    Initialization of *Service MUST be performed by InstantiateService.
+    Fix it later!!!
+    """
+
     def __init__(
         self,
         LogService: ILogService,
@@ -212,6 +218,7 @@ class MujocoRunner(IRunner):
         self.resolver: MujocoRefResolver | None = None
         self.placement_resolver: MujocoPlacementResolver | None = None
 
+        # Retry
         self.__MAX_RESET_RETRY = 1000
         self.__reset_passed = False
 
