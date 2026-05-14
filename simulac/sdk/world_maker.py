@@ -141,8 +141,10 @@ class WorldMakerFacade:
         env_id: str,
         entity: WorldEntity,
         entity_id: str | None = None,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
+        *,
+        fixed: bool | None = None,
     ) -> str:
         env_ret = self.EnvironmentManagementService.get_environment(env_id)
         if env_ret[0] is None:
@@ -151,7 +153,7 @@ class WorldMakerFacade:
         env = env_ret[0]
 
         return self.EnvironmentBuildService.add_entity(
-            env.id, entity, entity_id, pos, rot
+            env.id, entity, entity_id, pos, rot, fixed=fixed
         )
 
     def create_runner(self, env_id: str) -> IRunner:
