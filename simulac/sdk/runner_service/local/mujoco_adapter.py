@@ -12,6 +12,7 @@ from typing import (
     MutableMapping,
     NotRequired,
     TypedDict,
+    cast,
 )
 
 import mujoco
@@ -1157,11 +1158,16 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             self.env_id, self._runner_count, self._step_count_map
         )
 
-    def __prepare_child_root(
-        self, child: mujoco.MjSpec, entity_id: str, add_freejoint: bool
-    ):
+    def __prepare_stuff_root(
+        self,
+        child: mujoco.MjSpec,
+        entity_id: str,
+        *,
+        fixed: bool | None,
+    ) -> None:
         bodies: list[mujoco.MjsBody] = child.bodies
         roots = [body for body in bodies if body.parent == child.worldbody]
+
         if len(roots) != 1:
             raise SimulacBaseError(
                 f"MJCF asset for {entity_id!r} must have one root body"
@@ -1170,13 +1176,85 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         root = roots[0]
         root.name = "__root__"
 
-        if add_freejoint:
+        root_freejoints: list[mujoco.MjsJoint] = [
+            joint
+            for joint in cast(list[mujoco.MjsJoint], root.joints)
+            if int(joint.type) == int(mujoco.mjtJoint.mjJNT_FREE)
+        ]
+
+        if len(root_freejoints) > 1:
+            raise SimulacBaseError(
+                f"Stuff asset {entity_id!r} has multiple root freejoints. "
+                "Simulac can only manage one root freejoint."
+            )
+
+        if fixed is None:
+            # use asset setting
+            return
+        if fixed:
+            # force un-fixed stuff to fixed
+            for joint in root_freejoints:
+                joint_name = joint.name
+                if not joint_name:
+                    raise SimulacBaseError(
+                        f"Stuff asset {entity_id!r} has an unnamed root freejoint. "
+                        "Cannot safely remove it for fixed=True."
+                    )
+
+                references: list[str] = []
+
+                for actuator in child.actuators:
+                    actuator = cast(mujoco.MjsActuator, actuator)
+                    actuator_joint: mujoco.MjsJoint = getattr(actuator, "joint", None)
+                    if actuator_joint == joint or actuator_joint == joint_name:
+                        references.append(f"actuator:{actuator.name or '<unnamed>'}")
+
+                for sensor in child.sensors:
+                    sensor = cast(mujoco.MjsSensor, sensor)
+                    sensor_joint = getattr(sensor, "joint", None)
+                    if sensor_joint == joint or sensor_joint == joint_name:
+                        references.append(f"sensor:{sensor.name or '<unnamed>'}")
+
+                for equality in child.equalities:
+                    equality = cast(mujoco.MjsEquality, equality)
+                    equality_joint1 = getattr(equality, "joint1", None)
+                    equality_joint2 = getattr(equality, "joint2", None)
+                    if (
+                        equality_joint1 == joint
+                        or equality_joint2 == joint
+                        or equality_joint1 == joint_name
+                        or equality_joint2 == joint_name
+                    ):
+                        references.append(f"equality:{equality.name or '<unnamed>'}")
+
+                if references:
+                    raise SimulacBaseError(
+                        "\n".join(
+                            [
+                                (
+                                    f"Stuff asset {entity_id!r} was added with fixed=True, "
+                                    f"but its root freejoint {joint_name!r} is referenced."
+                                ),
+                                "Simulac cannot safely remove this freejoint automatically.",
+                                f"References: {', '.join(references)}",
+                                "Remove the root freejoint references from the asset or use fixed=False.",
+                            ]
+                        )
+                    )
+                joint_name = joint.name or "<unnamed>"
+                child.delete(joint)
+                self.LogService.warn(
+                    f"Removed root freejoint {joint_name!r} from Stuff asset {entity_id!r}"
+                )
+
+        if not fixed and len(root_freejoints) == 0:
+            # force fixed stuff to un-fixed
             root.add_freejoint(name="root_freejoint")
 
     def __add_stuff(self, stuff: EnvironmentStuffEntity):
         # TODO: URDF file is not handled here. Need handling code
         child = mujoco.MjSpec.from_file(stuff.asset_uri)
-        self.__prepare_child_root(child, stuff.id, add_freejoint=False)
+        self.__prepare_stuff_root(child, stuff.id, fixed=stuff.fixed)
 
         self.root_spec.attach(
             child, frame=self.root_frame, prefix=f"{stuff.id}/", suffix=""
@@ -1186,7 +1264,17 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         child = mujoco.MjSpec.from_file(machine.asset_uri)
         # TODO: @gangjeuk
         # handle machine.pos, machine.quat
-        self.__prepare_child_root(child, machine.id, add_freejoint=False)
+        bodies: list[mujoco.MjsBody] = child.bodies
+        roots = [body for body in bodies if body.parent == child.worldbody]
+
+        if len(roots) != 1:
+            raise SimulacBaseError(
+                f"MJCF asset for Robot {machine.id!r} must have one root body"
+            )
+
+        root = roots[0]
+        root.name = "__root__"
+
         self.root_spec.attach(
             child, frame=self.root_frame, prefix=f"{machine.id}/", suffix=""
         )
