@@ -727,3 +727,117 @@ class MujocoRefResolver:
             qz / norm,
             qw / norm,
         )
+
+
+class MujocoPlacementResolver:
+    def __init__(
+        self,
+        data: mujoco.MjData,
+        resolver: MujocoRefResolver,
+        *,
+        stuff_bindings: dict[str, MujocoStuffBinding],
+        machine_bindings: dict[str, MujocoRobotBinding],
+        camera_bindings: dict[str, MujocoCameraBinding],
+    ) -> None:
+        self.data = data
+        self.resolver = resolver
+        self._stuff_bindings = stuff_bindings
+        self._machine_bindings = machine_bindings
+        self._camera_bindings = camera_bindings
+
+    def resolve_entity_pos(
+        self,
+        entity_id: str,
+        pos: Any,
+    ) -> Vec3:
+
+        if isinstance(pos, SurfaceSampleRef):
+            return self.resolve_surface_sample_pos(
+                entity_id=entity_id,
+                ref=pos,
+            )
+
+        if isinstance(pos, PointRefBase):
+            return self.__vec3(self.resolver.resolve_point(pos))
+
+        return self.__vec3(pos)
+
+    def resolve_surface_sample_pos(
+        self,
+        *,
+        entity_id: str,
+        ref: SurfaceSampleRef,
+    ) -> Vec3:
+        target = self.__vec3(self.resolver.resolve_point(ref))
+
+        if ref.using is None:
+            return target
+
+        source_ref = self.__source_ref(entity_id, ref.using)
+        source = self.__vec3(self.resolver.resolve_point(source_ref))
+        root = self.__root_pos(entity_id)
+
+        return (
+            root[0] + target[0] - source[0],
+            root[1] + target[1] - source[1],
+            root[2] + target[2] - source[2],
+        )
+
+    def __source_ref(
+        self,
+        entity_id: str,
+        using: str | PointRefType,
+    ) -> PointRefType:
+        if isinstance(using, str):
+            return AnchorPosRef(entity_id, using)
+
+        if isinstance(using, PointRefBase):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return using
+
+        raise SimulacBaseError(f"Invalid surface sample using ref: {using!r}")
+
+    def __root_pos(self, entity_id: str) -> Vec3:
+        binding = self.__binding(entity_id)
+
+        root_body_id = binding.root_body_id
+        if root_body_id is None:
+            raise SimulacBaseError(
+                f"Entity {entity_id!r} does not have a root body for placement"
+            )
+
+        pos = self.data.xpos[root_body_id]
+        return (
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        )
+
+    def __binding(
+        self,
+        entity_id: str,
+    ) -> MujocoStuffBinding | MujocoRobotBinding | MujocoCameraBinding:
+        binding = self._stuff_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._machine_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._camera_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        raise SimulacBaseError(f"No MuJoCo binding for entity {entity_id!r}")
+
+    def __vec3(self, value: Any) -> Vec3:
+        try:
+            return (
+                float(value[0]),
+                float(value[1]),
+                float(value[2]),
+            )
+        except (TypeError, IndexError, ValueError) as exc:
+            raise SimulacBaseError(
+                f"Expected Vec3-compatible value: {value!r}"
+            ) from exc
