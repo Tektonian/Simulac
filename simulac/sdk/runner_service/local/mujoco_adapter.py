@@ -313,12 +313,24 @@ class MujocoRunner(IRunner):
         max_retry = None if self.__reset_passed else self.__MAX_RESET_RETRY
         while max_retry is None or retry_count <= self.__MAX_RESET_RETRY:
             candidate = self._sampling_candidate(sampler)
+            """NOTE: @gangjeuk
+            Need refactoring. Change code like below
+            ```python
+            mujoco.mj_resetData(self.mj_model, data)
+
+            self._apply_candidate_model_changes(candidate, sampler)
+            mujoco.mj_setConst(self.mj_model, data)
+
+            self._apply_candidate_state_changes(candidate, sampler)
+            mujoco.mj_forward(self.mj_model, data)
+            ```
+            """
 
             mujoco.mj_resetData(self.mj_model, data)
 
+            mujoco.mj_setConst(self.mj_model, data)
             self._apply_candidate(candidate, sampler)
 
-            mujoco.mj_setConst(self.mj_model, data)
             mujoco.mj_forward(self.mj_model, data)
 
             evaluation = self._evaluate_constraints()
