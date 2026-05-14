@@ -28,8 +28,10 @@ if TYPE_CHECKING:
         URDFPhysicsComponent,
         USDPhysicsComponent,
     )
+    from simulac.sdk.environment_service.common.model.ref import (
+        PointRefType,
+    )
     from simulac.sdk.environment_service.common.randomize import RandomizableVec3
-
 type EnvironmentEntityType = Union[
     EnvironmentStuffEntity,
     EnvironmentMachineEntity,
@@ -46,7 +48,7 @@ class IEnvironmentBuildService(ServiceIdentifier["IEnvironmentBuildService"]):
         env_id: str,
         entity: EnvironmentEntityType,
         entity_id: str | None = None,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
     ) -> str: ...
 
@@ -123,7 +125,7 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         env_id: str,
         entity: EnvironmentEntityType,
         entity_id: str | None = None,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
     ):
         """TODO: only support local file for now
@@ -147,6 +149,8 @@ class EnvironmentBuildService(IEnvironmentBuildService):
                 )
             )
         entity.id = new_entity_id
+        # TODO: @gangjeuk
+        # [ ] - error below will be solved when LightObject is implemented
         entity.pos = pos
         entity.rot = rot
 

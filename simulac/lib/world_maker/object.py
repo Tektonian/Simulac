@@ -114,7 +114,7 @@ class Environment:
     def add_entity(
         self,
         entity: Stuff,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -123,7 +123,7 @@ class Environment:
     def add_entity(
         self,
         entity: Camera,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -132,7 +132,7 @@ class Environment:
     def add_entity(
         self,
         entity: LightType,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -141,7 +141,7 @@ class Environment:
     def add_entity(
         self,
         entity: Robot[ActionT],
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -149,7 +149,7 @@ class Environment:
     def add_entity(
         self,
         entity: Stuff | Robot[ActionT] | Camera | LightType,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,

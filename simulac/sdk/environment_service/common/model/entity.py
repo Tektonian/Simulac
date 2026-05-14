@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Tuple
 
+from simulac.sdk.environment_service.common.model.ref import PointRefType
+
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.model.component import (
         RenderingComponent,
@@ -23,7 +25,7 @@ class EnvironmentMachineEntity:
     id: str | None = None
     description: str = ""
     asset_uri: str | None = None
-    pos: RandomizableVec3 = (0, 0, 0)
+    pos: RandomizableVec3 | PointRefType = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
 
     init_position: RandomizableFloatList | None = None
@@ -36,7 +38,7 @@ class EnvironmentStuffEntity:
     id: str | None = None
     description: str = ""
     asset_uri: str | None = None
-    pos: RandomizableVec3 = (0, 0, 0)
+    pos: RandomizableVec3 | PointRefType = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
     size: RandomizableVec3 = (1, 1, 1)
     fixed: RandomizableBool = True
