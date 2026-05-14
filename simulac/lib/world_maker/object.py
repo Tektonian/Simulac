@@ -193,7 +193,9 @@ class Environment:
                 rot=rot,
                 fixed=fixed,
             )
-            return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
+            return StuffObject(
+                env_stuff_obj, _create_sentinal=_CREATE_SENTINAL, env=self
+            )
         elif isinstance(entity, Robot):
             if fixed is not None:
                 raise SimulacBaseError(
@@ -283,7 +285,7 @@ class Environment:
         env = self._env
         for obj in env.stuffs:
             if obj.id == object_id:
-                return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL)
+                return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL, env=self)
         for obj in env.machines:
             if obj.id == object_id:
                 return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL)
@@ -320,11 +322,13 @@ class StuffObject:
         /,
         *,
         _create_sentinal: object,
+        env: Environment,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
 
         self._entity = entity
+        self._env = env
 
     # region TODO: @gangjeuk
     # [ ] - check collider, joint, surface exist
@@ -439,7 +443,11 @@ class StuffObject:
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
     def set_size(self, size: RandomizableVec3) -> None: ...
-    def set_fixed(self, is_fixed: RandomizableBool) -> None: ...
+    def set_fixed(self, is_fixed: bool) -> None:
+        self._env._assert_mutable()
+
+        self._entity.fixed = is_fixed
+
     def set_friction(self, friction: RandomizableFloat) -> None: ...
     def set_density(self, density: RandomizableFloat) -> None: ...
 
