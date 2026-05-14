@@ -7,14 +7,29 @@ from typing import (
     final,
 )
 
+from simulac.base.error.error import SimulacBaseError
+from simulac.base.types.geometry import Vec3
+from simulac.lib.world_maker.object import RobotObject, StuffObject
+from simulac.sdk.environment_service.common.model.constraint import (
+    BBoxConstraint,
+    DistanceConstraint,
+    NonpenetrationConstraint,
+)
+from simulac.sdk.environment_service.common.model.constraint import (
+    Constraint as SDKConstraint,
+)
+from simulac.sdk.environment_service.common.model.ref import RefBase
+
 if TYPE_CHECKING:
     from simulac.base.types.geometry import Vec3
+    from simulac.sdk.environment_service.common.model.constraint import (
+        BBoxConstraint,
+        DistanceConstraint,
+        NonpenetrationConstraint,
+    )
     from simulac.sdk.environment_service.common.randomize import (
-        BboxConstraintSpec,
         ChoiceRandomSpec,
-        DistanceConstraintSpec,
         EntryConstraintSpec,
-        NonpenetrationConstraintSpec,
         NormalRandomSpec,
         PlaneConstraintSpec,
         RandomConstraint,
@@ -28,33 +43,34 @@ class Constraint:
     """Helpers for building typed constraint specs."""
 
     @staticmethod
-    def nonpenetration(*between: str) -> NonpenetrationConstraintSpec:
-        """Prevent penetration between named objects."""
-        return {"type": "nonpenetration", "between": list(between)}
+    def distance(
+        a: StuffObject | RobotObject | str,
+        b: StuffObject | RobotObject | str,
+        *,
+        min: float | None = None,
+        max: float | None = None,
+    ) -> DistanceConstraint:
+        return SDKConstraint.distance(
+            _to_sdk_target(a), _to_sdk_target(b), min=min, max=max
+        )
+
+    @staticmethod
+    def nonpenetration(
+        *between: StuffObject | RobotObject | str,
+    ) -> NonpenetrationConstraint:
+        return SDKConstraint.nonpenetration(
+            *(_to_entity_id(target) for target in between)
+        )
 
     @staticmethod
     def bbox(
-        min: Vec3,
-        max: Vec3,
+        target: StuffObject | RobotObject | str,
+        lower: Vec3,
+        upper: Vec3,
         *,
-        mode: Literal["inside", "outside"],
-        center: Vec3 | None = None,
-    ) -> BboxConstraintSpec:
-        """Keep the sampled value inside or outside an axis-aligned box."""
-        spec: BboxConstraintSpec = {
-            "type": "bbox",
-            "min": min,
-            "max": max,
-            "mode": mode,
-        }
-        if center is not None:
-            spec["center"] = center
-        return spec
-
-    @staticmethod
-    def distance(*between: str, min: float, max: float) -> DistanceConstraintSpec:
-        """Clamp the distance between named objects."""
-        return {"type": "distance", "between": list(between), "min": min, "max": max}
+        mode: Literal["inside", "outside"] = "inside",
+    ) -> BBoxConstraint:
+        return SDKConstraint.bbox(_to_sdk_target(target), lower, upper, mode=mode)
 
     @staticmethod
     def __plane(
@@ -81,9 +97,29 @@ class Constraint:
         }
 
     @staticmethod
-    def entry(path: str) -> EntryConstraintSpec:
+    def __entry(path: str) -> EntryConstraintSpec:
         """Reference a reusable external constraint entry."""
         return {"type": "entry", "path": path}
+
+
+def _to_sdk_target(target: RefBase | StuffObject | RobotObject | str) -> str | RefBase:
+    if isinstance(target, RefBase):
+        return target
+
+    return _to_entity_id(target)
+
+
+def _to_entity_id(target: StuffObject | RobotObject | str) -> str:
+    if isinstance(target, str):
+        return target
+
+    if isinstance(target, (StuffObject, RobotObject)):  # pyright: ignore[reportUnnecessaryIsInstance]
+        entity_id = target._entity.id
+        if entity_id is None:
+            raise SimulacBaseError("Entity must be added before using it in Constraint")
+        return entity_id
+
+    raise SimulacBaseError(f"Unsupported constraint target: {target!r}")
 
 
 @final
