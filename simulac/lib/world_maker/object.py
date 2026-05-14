@@ -195,40 +195,6 @@ class Environment:
         # Should not reach
         raise NotImplementedError("Wrong entity")
 
-    def place_object(
-        self,
-        obj: StuffObject | RobotObject[Any],
-        *,
-        on: PlaceTargetRefType,
-        using: PlaceTargetRefType | None = None,
-        margin: RandomizableFloat = 0.0,
-    ):
-        """
-        # When user want to place something on another thing
-        env.place(
-            mug,
-            on=table.collider("top")
-            using=mug.collider("bottom"),
-            margin=0.04
-        )
-        """
-        self._assert_mutable()
-        if obj._entity.id is None:
-            raise SimulacBaseError("Entity must be added to Environment first")
-
-        # TODO: @gangjeuk
-        # [ ] - verify before place
-        # [o] - change `_entity.build_ops` to `_env.relations`
-
-        self._env.relations.append(
-            PlaceOp(
-                EntityRef(obj._entity.id),
-                as_place_target(on, margin=margin),
-                as_place_source(using),
-                margin,
-            )
-        )
-
     @overload
     def remove_object(
         self,
