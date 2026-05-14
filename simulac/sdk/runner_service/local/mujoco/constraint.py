@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from math import sqrt
+from typing import TYPE_CHECKING, Literal
 
 import mujoco
 
@@ -20,6 +22,52 @@ from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoStuffBinding,
 )
 from simulac.sdk.runner_service.local.mujoco.resolver import MujocoRefResolver
+
+if TYPE_CHECKING:
+    from simulac.sdk.log_service.common.log_service import ILogService
+
+
+@dataclass(frozen=True, slots=True)
+class MujocoConstraintFailure:
+    constraint_type: str
+    message: str
+    entities: tuple[str, ...] = ()
+    refs: tuple[str, ...] = ()
+    details: dict[str, object] = field(default_factory=dict)
+
+    def key(self) -> tuple[str, str, tuple[str, ...], tuple[str, ...]]:
+        return (
+            self.constraint_type,
+            self.message,
+            self.entities,
+            self.refs,
+        )
+
+    def format(self) -> str:
+        identity_parts: list[str] = []
+
+        if self.entities:
+            identity_parts.append(f"entities={self.entities!r}")
+
+        if self.refs:
+            identity_parts.append(f"refs={self.refs!r}")
+
+        detail_parts = [f"{key}={value!r}" for key, value in self.details.items()]
+
+        suffix_parts = identity_parts + detail_parts
+
+        if suffix_parts:
+            return (
+                f"[{self.constraint_type}] {self.message} ({', '.join(suffix_parts)})"
+            )
+
+        return f"[{self.constraint_type}] {self.message}"
+
+
+@dataclass(frozen=True, slots=True)
+class MujocoConstraintEvaluation:
+    passed: bool
+    failures: tuple[MujocoConstraintFailure, ...] = ()
 
 
 class MujocoConstraintEvaluator:
@@ -46,10 +94,24 @@ class MujocoConstraintEvaluator:
         self.resolver = resolver
         self.bindings = bindings
 
-    def passed(self, constraints: list[SceneConstraint]) -> bool:
-        return all(self._passed(constraint) for constraint in constraints)
+        # Constraint failed message cache for debugging
+        self.failed_message = dict[str, int]()
 
-    def _passed(self, constraint: SceneConstraint) -> bool:
+    def evaluate(
+        self, constraints: list[SceneConstraint]
+    ) -> MujocoConstraintEvaluation:
+        failures: list[MujocoConstraintFailure] = []
+
+        for constraint in constraints:
+            passed = self._passed(constraint)
+            if passed is not True:
+                failures.append(passed)
+
+        return MujocoConstraintEvaluation(passed=not failures, failures=tuple(failures))
+
+    def _passed(
+        self, constraint: SceneConstraint
+    ) -> Literal[True] | MujocoConstraintFailure:
         if isinstance(constraint, DistanceConstraint):
             return self._distance_passed(constraint)
 
@@ -64,7 +126,9 @@ class MujocoConstraintEvaluator:
 
         raise SimulacBaseError(f"Unsupported scene constraint: {constraint!r}")
 
-    def _distance_passed(self, constraint: DistanceConstraint) -> bool:
+    def _distance_passed(
+        self, constraint: DistanceConstraint
+    ) -> Literal[True] | MujocoConstraintFailure:
         a = self._resolve_target_point(constraint.a)
         b = self._resolve_target_point(constraint.b)
 
@@ -74,14 +138,34 @@ class MujocoConstraintEvaluator:
         distance = sqrt(dx * dx + dy * dy + dz * dz)
 
         if constraint.min is not None and distance < constraint.min:
-            return False
+            return MujocoConstraintFailure(
+                constraint_type="distance",
+                message="Distance is below minimum",
+                entities=tuple(self.__target_entities(constraint.a, constraint.b)),
+                details={
+                    "distance": distance,
+                    "min": constraint.min,
+                    "max": constraint.max,
+                },
+            )
 
         if constraint.max is not None and distance > constraint.max:
-            return False
+            return MujocoConstraintFailure(
+                constraint_type="distance",
+                message="Distance is above maximum",
+                entities=self.__target_entities(constraint.a, constraint.b),
+                details={
+                    "distance": distance,
+                    "min": constraint.min,
+                    "max": constraint.max,
+                },
+            )
 
         return True
 
-    def _bbox_passed(self, constraint: BBoxConstraint) -> bool:
+    def _bbox_passed(
+        self, constraint: BBoxConstraint
+    ) -> Literal[True] | MujocoConstraintFailure:
         point = self._resolve_target_point(constraint.target)
 
         inside = all(
@@ -89,24 +173,50 @@ class MujocoConstraintEvaluator:
         )
 
         if constraint.mode == "inside":
-            return inside
+            if inside is True:
+                return inside
+            else:
+                return MujocoConstraintFailure(
+                    constraint_type="bbox",
+                    message="entity placed outside the box",
+                    entities=self.__target_entities(constraint.target),
+                    details={
+                        "lower": constraint.lower,
+                        "upper": constraint.upper,
+                    },
+                )
 
         if constraint.mode == "outside":
-            return not inside
-
+            if inside is False:
+                return True
+            else:
+                return MujocoConstraintFailure(
+                    constraint_type="bbox",
+                    message="entity placed inside the box",
+                    entities=self.__target_entities(constraint.target),
+                    details={
+                        "lower": constraint.lower,
+                        "upper": constraint.upper,
+                    },
+                )
         raise SimulacBaseError(f"Unsupported bbox mode: {constraint.mode}")
 
-    def _nonpenetration_passed(self, constraint: NonpenetrationConstraint) -> bool:
+    def _nonpenetration_passed(
+        self, constraint: NonpenetrationConstraint
+    ) -> Literal[True] | MujocoConstraintFailure:
         entity_ids = tuple(target.entity_id for target in constraint.entities)
 
         for i, a in enumerate(entity_ids):
             for b in entity_ids[i + 1 :]:
-                if not self._pair_nonpenetration_passed(a, b):
-                    return False
+                ret = self._pair_nonpenetration_passed(a, b)
+                if ret is not True:
+                    return ret
 
         return True
 
-    def _pair_nonpenetration_passed(self, a: str, b: str) -> bool:
+    def _pair_nonpenetration_passed(
+        self, a: str, b: str
+    ) -> Literal[True] | MujocoConstraintFailure:
         binding_a = self.bindings.get(a)
         binding_b = self.bindings.get(b)
 
@@ -156,7 +266,16 @@ class MujocoConstraintEvaluator:
             g1, g2 = int(contact.geom1), int(contact.geom2)
 
             if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
-                return False
+                return MujocoConstraintFailure(
+                    constraint_type="nonpenetration",
+                    message="Entities are penetrating",
+                    entities=(a, b),
+                    details={
+                        "geom1": g1,
+                        "geom2": g2,
+                        "dist": contact.dist,
+                    },
+                )
 
         return True
 
@@ -175,3 +294,21 @@ class MujocoConstraintEvaluator:
             return self.resolver.resolve_point(target.ref)
 
         raise SimulacBaseError(f"Unsupported constraint target: {target!r}")
+
+    def __target_entities(
+        self,
+        *targets: EntityTarget | RefTarget,
+    ) -> tuple[str, ...]:
+        entity_ids: list[str] = []
+
+        for target in targets:
+            if isinstance(target, EntityTarget):
+                entity_ids.append(target.entity_id)
+                continue
+
+            if isinstance(target, RefTarget):  # pyright: ignore[reportUnnecessaryIsInstance]
+                entity_id = getattr(target.ref, "entity_id", None)
+                if isinstance(entity_id, str):
+                    entity_ids.append(entity_id)
+
+        return tuple(entity_ids)

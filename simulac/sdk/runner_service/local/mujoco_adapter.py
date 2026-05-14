@@ -80,8 +80,11 @@ from simulac.sdk.runner_service.local.mujoco.runtime import (
     MujocoStuffRuntimeOps,
 )
 
-from .mujoco.resolver import MujocoRefResolver
-from .mujoco.constraint import MujocoConstraintEvaluator
+from .mujoco.constraint import (
+    MujocoConstraintEvaluation,
+    MujocoConstraintEvaluator,
+)
+from .mujoco.resolver import MujocoPlacementResolver, MujocoRefResolver
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -211,6 +214,16 @@ class MujocoRunner(IRunner):
         self.__MAX_RESET_RETRY = 1000
         self.__reset_passed = False
 
+        # Constriant debugging
+        self._reset_failure_count: dict[
+            tuple[str, str, tuple[str, ...], tuple[str, ...]],
+            int,
+        ] = {}
+        self._reset_failure_examples: dict[
+            tuple[str, str, tuple[str, ...], tuple[str, ...]],
+            str,
+        ] = {}
+
     def initialize(self) -> None:
         self._data = mujoco.MjData(self.mj_model)
         mujoco.mj_forward(self.mj_model, self._data)
@@ -299,11 +312,54 @@ class MujocoRunner(IRunner):
             mujoco.mj_setConst(self.mj_model, data)
             mujoco.mj_forward(self.mj_model, data)
 
-            if not self._constraints_pass():
-                if retry_count == 100:
-                    self.LogService.warn(
-                        f"Reset count Runner {self.runner_id} / Environment {self.env.id} enreached 100 counts. Please check your environment setting once again"
+            evaluation = self._evaluate_constraints()
+
+            if not evaluation.passed:
+                failure_logs: list[str] = []
+                for failure in evaluation.failures:
+                    failure_key = failure.key()
+                    failure_text = failure.format()
+
+                    self._reset_failure_count[failure_key] = (
+                        self._reset_failure_count.get(failure_key, 0) + 1
                     )
+                    self._reset_failure_examples[failure_key] = failure_text
+
+                    self.LogService.debug(failure_text)
+                    failure_logs.append(failure_text)
+
+                if retry_count >= 100 and retry_count % 100 == 0:
+                    suspicious_failures = sorted(
+                        self._reset_failure_count.items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                    suspicious_lines = [
+                        "---------- Reset sampling warning ----------",
+                        (
+                            f"Reset count is too high: runner={self.runner_id!r}, "
+                            f"environment={self.env.id!r}, retry_count={retry_count}."
+                        ),
+                        (
+                            "The environment has failed to sample a valid reset state many times. "
+                            "This usually means one or more constraints are too strict, "
+                            "objects are initialized in penetration, or the placement randomization "
+                            "does not cover a feasible region."
+                        ),
+                        "---------- Suspicious constraints ----------",
+                        "Most frequent constraint failures:",
+                    ]
+                    for failure_key, count in suspicious_failures[:10]:
+                        example = self._reset_failure_examples[failure_key]
+                        suspicious_lines.append(f"  - count={count}: {example}")
+
+                    suspicious_lines.append("Current retry failures:")
+                    suspicious_lines.extend(
+                        f"  - {failure_text}" for failure_text in failure_logs
+                    )
+
+                    self.LogService.warn("\n".join(suspicious_lines))
+
                 retry_count += 1
                 continue
 
@@ -940,7 +996,7 @@ class MujocoRunner(IRunner):
 
         return obj_id
 
-    def _constraints_pass(self) -> bool:
+    def _evaluate_constraints(self) -> MujocoConstraintEvaluation:
         evaluator = MujocoConstraintEvaluator(
             model=self.mj_model,
             data=self._require_data(),
@@ -951,7 +1007,7 @@ class MujocoRunner(IRunner):
                 **self._camera_bindings,
             },
         )
-        return evaluator.passed(self.env.constraints)
+        return evaluator.evaluate(self.env.constraints)
 
 
 class MujocoAdapter(IPhysicsEngineAdapter):
