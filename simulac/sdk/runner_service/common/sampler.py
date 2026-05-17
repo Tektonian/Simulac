@@ -26,6 +26,9 @@ class ResetSampler:
     @overload
     def sample[T](self, value: RandomSpec[T]) -> RandomSpec[T]: ...
     def sample[T](self, value: list[T]) -> list[T]:
+        """TODO: @gangjeuk
+        Need Refactoring!!
+        """
         if isinstance(value, RefBase):
             return self.sample_ref(value)
 
@@ -62,7 +65,12 @@ class ResetSampler:
                 entity_id=ref.entity_id,
                 collider_name=ref.collider_name,
                 side=ref.side,
-                margin=float(self.sample(ref.margin)),
+                using=ref.using,
+                margin=self.sample(ref.margin),
+                x=self.sample(ref.x) if ref.x is not None else None,
+                y=self.sample(ref.y) if ref.y is not None else None,
+                offset=self.sample(ref.offset),
+                offset_frame=ref.offset_frame,
             )
 
         if isinstance(ref, SupportPointRef):

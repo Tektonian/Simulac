@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from math import sqrt
-from typing import Literal, cast, overload
+from typing import Any, Literal, cast, overload
 
 import mujoco
 
@@ -27,6 +27,8 @@ from simulac.sdk.environment_service.common.model.ref import (
     JointAxisRef,
     JointRef,
     LightPosRef,
+    PointRefBase,
+    PointRefType,
     RefBase,
     SupportPointRef,
     SurfaceCenterRef,
@@ -35,6 +37,7 @@ from simulac.sdk.environment_service.common.model.ref import (
     WorldPointRef,
 )
 from simulac.sdk.environment_service.common.randomize import Randomizable
+from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
     MujocoRobotBinding,
@@ -586,13 +589,47 @@ class MujocoRefResolver:
             tangent_axes = [idx for idx in range(3) if idx != axis_idx]
             local_offset = [0.0, 0.0, 0.0]
 
-            for idx in tangent_axes:
+            for axis_order, idx in enumerate(tangent_axes):
+                explicit = ref.x if axis_order == 0 else ref.y
                 span = max(float(size[idx]) - margin, 0.0)
-                local_offset[idx] = random.uniform(-span, span)
 
-            world_offset = self.__rot_local_to_world(
-                xmat, cast(Vec3, tuple(local_offset))
-            )
+                if explicit is None:
+                    local_offset[idx] = random.uniform(-span, span)
+                else:
+                    value = self.__require_concrete_float(explicit)
+                    local_offset[idx] = max(-span, min(span, value))
+
+            offset = self.__require_concrete_vec3(ref.offset)
+
+            if ref.offset_frame == "target":
+                local_offset[0] += float(offset[0])
+                local_offset[1] += float(offset[1])
+                local_offset[2] += float(offset[2])
+
+                world_offset = self.__rot_local_to_world(
+                    xmat,
+                    (
+                        float(local_offset[0]),
+                        float(local_offset[1]),
+                        float(local_offset[2]),
+                    ),
+                )
+            elif ref.offset_frame == "world":
+                world_sample_offset = self.__rot_local_to_world(
+                    xmat,
+                    (
+                        float(local_offset[0]),
+                        float(local_offset[1]),
+                        float(local_offset[2]),
+                    ),
+                )
+                world_offset = (
+                    world_sample_offset[0] + float(offset[0]),
+                    world_sample_offset[1] + float(offset[1]),
+                    world_sample_offset[2] + float(offset[2]),
+                )
+            else:
+                raise SimulacBaseError(f"Unsupported offset frame: {ref.offset_frame}")
 
             center = (
                 center[0] + world_offset[0],
@@ -727,3 +764,117 @@ class MujocoRefResolver:
             qz / norm,
             qw / norm,
         )
+
+
+class MujocoPlacementResolver:
+    def __init__(
+        self,
+        data: mujoco.MjData,
+        resolver: MujocoRefResolver,
+        *,
+        stuff_bindings: dict[str, MujocoStuffBinding],
+        machine_bindings: dict[str, MujocoRobotBinding],
+        camera_bindings: dict[str, MujocoCameraBinding],
+    ) -> None:
+        self.data = data
+        self.resolver = resolver
+        self._stuff_bindings = stuff_bindings
+        self._machine_bindings = machine_bindings
+        self._camera_bindings = camera_bindings
+
+    def resolve_entity_pos(
+        self,
+        entity_id: str,
+        pos: Any,
+    ) -> Vec3:
+
+        if isinstance(pos, SurfaceSampleRef):
+            return self.resolve_surface_sample_pos(
+                entity_id=entity_id,
+                ref=pos,
+            )
+
+        if isinstance(pos, PointRefBase):
+            return self.__vec3(self.resolver.resolve_point(pos))
+
+        return self.__vec3(pos)
+
+    def resolve_surface_sample_pos(
+        self,
+        *,
+        entity_id: str,
+        ref: SurfaceSampleRef,
+    ) -> Vec3:
+        target = self.__vec3(self.resolver.resolve_point(ref))
+
+        if ref.using is None:
+            return target
+
+        source_ref = self.__source_ref(entity_id, ref.using)
+        source = self.__vec3(self.resolver.resolve_point(source_ref))
+        root = self.__root_pos(entity_id)
+
+        return (
+            root[0] + target[0] - source[0],
+            root[1] + target[1] - source[1],
+            root[2] + target[2] - source[2],
+        )
+
+    def __source_ref(
+        self,
+        entity_id: str,
+        using: str | PointRefType,
+    ) -> PointRefType:
+        if isinstance(using, str):
+            return AnchorPosRef(entity_id, using)
+
+        if isinstance(using, PointRefBase):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return using
+
+        raise SimulacBaseError(f"Invalid surface sample using ref: {using!r}")
+
+    def __root_pos(self, entity_id: str) -> Vec3:
+        binding = self.__binding(entity_id)
+
+        root_body_id = binding.root_body_id
+        if root_body_id is None:
+            raise SimulacBaseError(
+                f"Entity {entity_id!r} does not have a root body for placement"
+            )
+
+        pos = self.data.xpos[root_body_id]
+        return (
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        )
+
+    def __binding(
+        self,
+        entity_id: str,
+    ) -> MujocoStuffBinding | MujocoRobotBinding | MujocoCameraBinding:
+        binding = self._stuff_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._machine_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._camera_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        raise SimulacBaseError(f"No MuJoCo binding for entity {entity_id!r}")
+
+    def __vec3(self, value: Any) -> Vec3:
+        try:
+            return (
+                float(value[0]),
+                float(value[1]),
+                float(value[2]),
+            )
+        except (TypeError, IndexError, ValueError) as exc:
+            raise SimulacBaseError(
+                f"Expected Vec3-compatible value: {value!r}"
+            ) from exc

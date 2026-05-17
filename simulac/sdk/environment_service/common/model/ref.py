@@ -194,8 +194,31 @@ class SurfaceRef(RefBase):
     def normal(self) -> SurfaceNormalRef:
         return SurfaceNormalRef(self.entity_id, self.collider_name, self.side)
 
-    def sample(self, margin: RandomizableFloat = 0.0) -> SurfaceSampleRef:
-        return SurfaceSampleRef(self.entity_id, self.collider_name, self.side, margin)
+    def sample(
+        self,
+        using: str | "PointRefType" | None = None,
+        margin: RandomizableFloat = 0.0,
+        x: RandomizableFloat | None = None,
+        y: RandomizableFloat | None = None,
+        offset: RandomizableVec3 = (0.0, 0.0, 0.0),
+        offset_frame: OffsetFrame = "target",
+    ) -> SurfaceSampleRef:
+        if isinstance(using, str):
+            source: str | PointRefType | None = using
+        else:
+            source = using
+
+        return SurfaceSampleRef(
+            entity_id=self.entity_id,
+            collider_name=self.collider_name,
+            side=self.side,
+            using=source,
+            margin=margin,
+            x=x,
+            y=y,
+            offset=offset,
+            offset_frame=offset_frame,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,7 +233,12 @@ class SurfaceSampleRef(PointRefBase):
     entity_id: str
     collider_name: str
     side: AxisSide
+    using: str | PointRefType | None = None
     margin: RandomizableFloat = 0.0
+    x: RandomizableFloat | None = None
+    y: RandomizableFloat | None = None
+    offset: RandomizableVec3 = (0.0, 0.0, 0.0)
+    offset_frame: OffsetFrame = "target"
 
 
 @dataclass(frozen=True, slots=True)

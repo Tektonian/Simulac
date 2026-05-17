@@ -178,6 +178,12 @@ def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
 
 
 class MujocoRunner(IRunner):
+    """NOTE, FIXME: @gangjeuk
+    Now usage pattern of LogService in mujoco_adapter.py and all files in /mujoco is anti-pattern.
+    Initialization of *Service MUST be performed by InstantiateService.
+    Fix it later!!!
+    """
+
     def __init__(
         self,
         LogService: ILogService,
@@ -210,7 +216,9 @@ class MujocoRunner(IRunner):
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
         self.resolver: MujocoRefResolver | None = None
+        self.placement_resolver: MujocoPlacementResolver | None = None
 
+        # Retry
         self.__MAX_RESET_RETRY = 1000
         self.__reset_passed = False
 
@@ -437,9 +445,12 @@ class MujocoRunner(IRunner):
             self._runtimes[eid] = camera_runtime
 
     def _apply_candidate(
-        self, candidate: dict[str, dict[str, Any]], sampler: ResetSampler
+        self,
+        candidate: dict[str, dict[str, Any]],
+        sampler: ResetSampler,
     ) -> None:
         data = self._require_data()
+
         self.resolver = MujocoRefResolver(
             self.mj_model,
             data,
@@ -448,49 +459,74 @@ class MujocoRunner(IRunner):
             camera_bindings=self._camera_bindings,
         )
 
+        self.placement_resolver = MujocoPlacementResolver(
+            data=data,
+            resolver=self.resolver,
+            stuff_bindings=self._stuff_bindings,
+            machine_bindings=self._machine_bindings,
+            camera_bindings=self._camera_bindings,
+        )
+
+        placement_entities: list[str] = []
+
         for eid, values in candidate.items():
             binding = self._entity_binding(eid)
-            pos = values.get("pos")
-            if isinstance(pos, RefBase):
-                pos = self.resolver.resolve_point(sampler.sample(pos))
 
+            pos = values.get("pos")
             rot = values.get("rot")
+
             quat = None
             if rot is not None and not isinstance(rot, RefBase):
                 quat = euler_to_quat(*rot)
 
+            if isinstance(pos, SurfaceSampleRef):
+                placement_entities.append(eid)
+                base_pos = None
+            elif isinstance(pos, PointRefBase):
+                base_pos = self.resolver.resolve_point(pos)
+            else:
+                base_pos = pos
+
             if eid in self._camera_bindings:
-                self._apply_camera_pose(self._camera_bindings[eid], pos, quat)
-                continue
-
-            self._apply_root_pose(binding, pos, quat)
-
-            friction = values.get("friction")
-            if (
-                eid in self._stuff_bindings
-                and friction is not None
-                and not isinstance(friction, RefBase)
-            ):
-                self._apply_stuff_friction(self._stuff_bindings[eid], friction)
-
-            mass = values.get("mass")
-            if (
-                eid in self._stuff_bindings
-                and mass is not None
-                and not isinstance(mass, RefBase)
-            ):
-                self._apply_stuff_mass(self._stuff_bindings[eid], mass)
+                self._apply_camera_pose(self._camera_bindings[eid], base_pos, quat)
+            else:
+                self._apply_root_pose(binding, base_pos, quat)
 
         mujoco.mj_forward(self.mj_model, data)
+
+        for eid in placement_entities:
+            values = candidate[eid]
+            binding = self._entity_binding(eid)
+
+            pos = self.placement_resolver.resolve_entity_pos(
+                entity_id=eid,
+                pos=values["pos"],
+            )
+
+            if eid in self._camera_bindings:
+                self._apply_camera_pose(self._camera_bindings[eid], pos, None)
+            else:
+                self._apply_root_pose(binding, pos, None)
+
+        mujoco.mj_forward(self.mj_model, data)
+
         for eid, values in candidate.items():
-            ops = [
-                placeop
-                for placeop in self.env.relations
-                if placeop.entity.entity_id == eid
-            ]
-            for op in ops:
-                self._apply_build_op(eid, op, self.resolver, sampler)
-                mujoco.mj_forward(self.mj_model, data)
+            if eid not in self._stuff_bindings:
+                continue
+
+            binding = self._stuff_bindings[eid]
+
+            friction = values.get("friction")
+            if friction is not None:
+                self._apply_stuff_friction(binding, friction)
+
+            density = values.get("density")
+            if density is not None:
+                self._apply_stuff_density(binding, density)
+
+            mass = values.get("mass")
+            if mass is not None:
+                self._apply_stuff_mass(binding, mass)
 
     def _entity_binding(
         self,
