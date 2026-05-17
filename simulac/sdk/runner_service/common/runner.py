@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, overload
 
 if TYPE_CHECKING:
-    from .model.runtime import StuffRuntime
+    from .model.runtime import RobotRuntime, StuffRuntime
 
 
 @dataclass
@@ -39,14 +39,16 @@ class IRunner(ABC):
         pass
 
     @abstractmethod
-    def get_runtime_object(self, entity_id: str) -> StuffRuntime: ...
+    def get_runtime_object(self, entity_id: str) -> StuffRuntime | RobotRuntime: ...
 
     @abstractmethod
     def clone_state(self) -> None: ...
 
     @abstractmethod
-    def render(self) -> None:
-        pass
+    def snapshot(self) -> None:
+        """Take a snapshot (like a screenshot).
+        This is for future use, when we implemented web browser renderer
+        """
 
     @abstractmethod
     def _debug_render(self) -> Any:

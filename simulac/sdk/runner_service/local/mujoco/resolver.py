@@ -11,6 +11,7 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Quat, Vec3
 from simulac.sdk.environment_service.common.model.ref import (
     AnchorPosRef,
+    AnchorRef,
     BodyPosRef,
     BoundsCenterRef,
     BoundsMaxRef,
@@ -18,8 +19,10 @@ from simulac.sdk.environment_service.common.model.ref import (
     BoundsSizeRef,
     CameraPosRef,
     ColliderCenterRef,
+    ColliderRef,
     EntityPosRef,
     EntityQuatRef,
+    EntityRef,
     EntityRotRef,
     JointAxisRef,
     JointRef,
@@ -33,6 +36,7 @@ from simulac.sdk.environment_service.common.model.ref import (
 )
 from simulac.sdk.environment_service.common.randomize import Randomizable
 from simulac.sdk.runner_service.local.mujoco.binding import (
+    MujocoCameraBinding,
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
@@ -107,11 +111,55 @@ class MujocoRefResolver:
         *,
         stuff_bindings: dict[str, MujocoStuffBinding],
         machine_bindings: dict[str, MujocoRobotBinding],
+        camera_bindings: dict[str, MujocoCameraBinding],
     ) -> None:
         self.model = model
         self.data = data
         self._stuff_bindings = stuff_bindings
         self._machine_bindings = machine_bindings
+        self._camera_bindings = camera_bindings
+
+    def resolve_frame(
+        self, ref: EntityRef | AnchorPosRef | ColliderRef
+    ) -> tuple[Vec3, Quat]:
+        data = self.data
+
+        if isinstance(ref, EntityRef):
+            binding = self._binding(ref.entity_id)
+            pos = data.xpos[binding.root_body_id]
+            quat = data.xquat[binding.root_body_id]
+            return (
+                (float(pos[0]), float(pos[1]), float(pos[2])),
+                (float(quat[1]), float(quat[2]), float(quat[3]), float(quat[0])),
+            )
+
+        if isinstance(ref, AnchorRef):
+            site_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_SITE,
+                ref.entity_id,
+                ref.name,
+            )
+            pos = data.site_xpos[site_id]
+            xmat = data.site_xmat[site_id]
+            return (
+                (float(pos[0]), float(pos[1]), float(pos[2])),
+                self.__mat_to_quat_xyzw(xmat),
+            )
+
+        if isinstance(ref, ColliderRef):
+            geom_id = self._named_id(
+                mujoco.mjtObj.mjOBJ_GEOM,
+                ref.entity_id,
+                ref.name,
+            )
+            pos = data.geom_xpos[geom_id]
+            xmat = data.geom_xmat[geom_id]
+            return (
+                (float(pos[0]), float(pos[1]), float(pos[2])),
+                self.__mat_to_quat_xyzw(xmat),
+            )
+
+        raise SimulacBaseError(f"Unsupported frame ref: {ref}")
 
     def resolve_point(self, ref: RefBase) -> Vec3:
         if isinstance(ref, WorldPointRef):
@@ -633,3 +681,49 @@ class MujocoRefResolver:
         if not isinstance(value, tuple):
             raise SimulacBaseError("RandomizableVec3 must be sampled before resolve")
         return value
+
+    def __mat_to_quat_xyzw(
+        self, xmat: tuple[float, float, float, float, float, float, float, float, float]
+    ) -> Quat:
+        # TODO: @gangjeuk
+        # Refactoring this function
+        # Dup of mujoco_adapter::_mat_to_quat_xyzw_from_values
+        m00, m01, m02 = float(xmat[0]), float(xmat[1]), float(xmat[2])
+        m10, m11, m12 = float(xmat[3]), float(xmat[4]), float(xmat[5])
+        m20, m21, m22 = float(xmat[6]), float(xmat[7]), float(xmat[8])
+
+        trace = m00 + m11 + m22
+
+        if trace > 0.0:
+            s = (trace + 1.0) ** 0.5 * 2.0
+            qw = 0.25 * s
+            qx = (m21 - m12) / s
+            qy = (m02 - m20) / s
+            qz = (m10 - m01) / s
+        elif m00 > m11 and m00 > m22:
+            s = (1.0 + m00 - m11 - m22) ** 0.5 * 2.0
+            qw = (m21 - m12) / s
+            qx = 0.25 * s
+            qy = (m01 + m10) / s
+            qz = (m02 + m20) / s
+        elif m11 > m22:
+            s = (1.0 + m11 - m00 - m22) ** 0.5 * 2.0
+            qw = (m02 - m20) / s
+            qx = (m01 + m10) / s
+            qy = 0.25 * s
+            qz = (m12 + m21) / s
+        else:
+            s = (1.0 + m22 - m00 - m11) ** 0.5 * 2.0
+            qw = (m10 - m01) / s
+            qx = (m02 + m20) / s
+            qy = (m12 + m21) / s
+            qz = 0.25 * s
+
+        norm = max((qx * qx + qy * qy + qz * qz + qw * qw) ** 0.5, 1e-9)
+
+        return (
+            qx / norm,
+            qy / norm,
+            qz / norm,
+            qw / norm,
+        )

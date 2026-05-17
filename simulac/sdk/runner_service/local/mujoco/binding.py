@@ -92,3 +92,17 @@ class MujocoActuatorBinding:
     act_range: tuple[float, float] | None = None
 
     group: int = 0
+
+@dataclass(slots=True)
+class MujocoCameraBinding:
+    entity_id: str
+
+    camera_id: int
+    camera_name: str
+    camera_full_name: str
+
+    # below four are for attached or following cameras
+    root_body_id: int | None
+    root_body_name: str | None
+    root_body_full_name: str | None
+    mocap_id: int = -1

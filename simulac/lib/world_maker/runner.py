@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
+from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
 
 from .entity import ActionT
@@ -17,7 +18,13 @@ from .object import (
 )
 
 if TYPE_CHECKING:
-    from simulac.sdk.runner_service.common.model.object import (
+    from simulac.sdk.runner_service.common.model.runtime import (
+        CameraRuntime as SDKCameraRuntime,
+    )
+    from simulac.sdk.runner_service.common.model.runtime import (
+        RobotRuntime as SDKRobotRuntime,
+    )
+    from simulac.sdk.runner_service.common.model.runtime import (
         StuffRuntime as SDKStuffRuntime,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
@@ -35,14 +42,17 @@ class StuffRuntime:
             raise SimulacBaseError("Please do not create stuff object directly")
         self._runtime = runtime_object
 
-    def change_mass(self, mass: float) -> None: ...
+    def change_mass(self, mass: float) -> None:
+        self._runtime.change_mass(mass)
+
     def change_pos(self, pos: Vec3) -> None:
         self._runtime.change_pos(pos)
 
-    def change_size(self, size: Vec3) -> None: ...
-    def change_fixed(self, is_fixed: bool) -> None: ...
-    def change_friction(self, friction: float) -> None: ...
-    def change_density(self, density: float) -> None: ...
+    def change_rot(self, rot: Vec3) -> None:
+        self._runtime.change_quat(euler_to_quat(*rot))
+
+    def change_friction(self, friction: float) -> None:
+        self._runtime.change_friction(friction)
 
     def joint(self, name: str) -> None:
         """Runtime joint control
@@ -63,36 +73,77 @@ class StuffRuntime:
 class RobotRuntime(Generic[ActionT]):
     def __init__(
         self,
+        runtime_object: SDKRobotRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create robot runtime directly")
+        self._runtime = runtime_object
 
-    def step(self, action: ActionT) -> None: ...
-    def tick(self) -> None: ...
+    def step(self, action: ActionT) -> None:
+        self._runtime.step(list(action))
 
-    def get_pos(self) -> Vec3: ...
-    def get_vel(self) -> list[float]: ...
+    def tick(self) -> None:
+        self._runtime.tick()
+
+    def get_pos(self) -> Vec3:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def get_joint_pos(self) -> list[float]:
+        return self._runtime.get_joint_pos()
+
+    def get_joint_vel(self) -> list[float]:
+        return self._runtime.get_joint_vel()
+
+    def change_joint_pos(self, joint_pos: list[float]) -> None:
+        self._runtime.change_joint_pos(joint_pos)
+
+    def change_joint_vel(self, joint_vel: list[float]) -> None:
+        self._runtime.change_joint_vel(joint_vel)
+
+    # NOTE: below two are future use,
+    # since our team concluded that we are focuing on `pos` control
+    def _change_target_vel(self, vel: float) -> None: ...
+    def _change_target_force(self, force: float) -> None: ...
 
 
 class CameraRuntime:
     def __init__(
         self,
+        runtime_object: SDKCameraRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create runtime camera directly")
+        self._runtime = runtime_object
 
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_rot(self, rot: Vec3) -> None: ...
+    def get_pos(self) -> Vec3:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def change_pos(self, pos: Vec3) -> None:
+        self._runtime.change_pos(pos)
+
+    def change_rot(self, rot: Vec3) -> None:
+        self._runtime.change_quat(euler_to_quat(*rot))
+
+    def get_fov(self) -> float:
+        return self._runtime.get_fov()
+
     def change_fov(self, fov: float) -> None:
         """for zoom mocking
         Needed?
         """
+        self._runtime.change_fov(fov)
 
 
 class LightRuntime:
@@ -241,9 +292,23 @@ class Runner:
     def get_runtime_object(
         self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
     ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime:
-
+        if obj._entity.id is None:
+            raise SimulacBaseError("Entity should be added before runtime initialized")
         runtime_object = self._runner.get_runtime_object(obj._entity.id)
-        return StuffRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, StuffObject):
+            return StuffRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, RobotObject):
+            return RobotRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, LightObject):
+            return LightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, CameraObject):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return CameraRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        raise SimulacBaseError(f"Unsupported runtime object: {type(obj).__name__}")
 
     def close(self) -> None: ...
 
