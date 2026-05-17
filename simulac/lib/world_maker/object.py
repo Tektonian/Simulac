@@ -117,6 +117,8 @@ class Environment:
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
+        *,
+        fixed: bool | None = None,
     ) -> StuffObject: ...
     @overload
     def add_entity(
@@ -126,6 +128,8 @@ class Environment:
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
+        *,
+        fixed: bool | None = None,
     ) -> CameraObject: ...
     @overload
     def add_entity(
@@ -135,6 +139,8 @@ class Environment:
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
+        *,
+        fixed: bool | None = None,
     ) -> LightObject: ...
     @overload
     def add_entity(
@@ -144,6 +150,8 @@ class Environment:
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
+        *,
+        fixed: bool | None = None,
     ) -> RobotObject[ActionT]: ...
     def add_entity(
         self,
@@ -152,6 +160,8 @@ class Environment:
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
+        *,
+        fixed: bool | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
         """_summary_
 
@@ -176,10 +186,26 @@ class Environment:
                 entity.obj_uri_or_prebuilt_name, description=description
             )
             self._world_maker.add_entity(
-                self._env.id, env_stuff_obj, entity_id, pos=pos, rot=rot
+                self._env.id,
+                env_stuff_obj,
+                entity_id,
+                pos=pos,
+                rot=rot,
+                fixed=fixed,
             )
-            return StuffObject(env_stuff_obj, _create_sentinal=_CREATE_SENTINAL)
+            return StuffObject(
+                env_stuff_obj, _create_sentinal=_CREATE_SENTINAL, env=self
+            )
         elif isinstance(entity, Robot):
+            if fixed is not None:
+                raise SimulacBaseError(
+                    "\n".join(
+                        [
+                            "fixed is only supported for Stuff entities.",
+                            "Edit your robot asset file if you want to change it",
+                        ]
+                    )
+                )
             env_robot_obj = self._world_maker.create_machine_entity(
                 entity.obj_uri_or_prebuilt_name, description=description
             )
@@ -191,6 +217,15 @@ class Environment:
                 RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
             )
         elif isinstance(entity, Camera):
+            if fixed is not None:
+                raise SimulacBaseError(
+                    "\n".join(
+                        [
+                            "fixed is only supported for Stuff entities.",
+                            "If you want to movable camera, use `.attach()`",
+                        ]
+                    )
+                )
             env_camera_obj = self._world_maker.create_camera_entity(
                 entity._to_spec(), description=description
             )
@@ -200,7 +235,16 @@ class Environment:
             return CameraObject(
                 env_camera_obj, _create_sentinal=_CREATE_SENTINAL, env=self._env
             )
-        else:
+        elif isinstance(entity, (AreaLight, SpotLight, PointLight, AmbientLight)):  # pyright: ignore[reportUnnecessaryIsInstance]
+            if fixed is not None:
+                raise SimulacBaseError(
+                    "\n".join(
+                        [
+                            "fixed is only supported for Stuff entities.",
+                            "If you want to movable light, use `.attach()`",
+                        ]
+                    )
+                )
             env_light_obj = self._world_maker.create_light_entity(
                 entity._to_spec(), description=description
             )
@@ -241,7 +285,7 @@ class Environment:
         env = self._env
         for obj in env.stuffs:
             if obj.id == object_id:
-                return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL)
+                return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL, env=self)
         for obj in env.machines:
             if obj.id == object_id:
                 return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL)
@@ -278,11 +322,13 @@ class StuffObject:
         /,
         *,
         _create_sentinal: object,
+        env: Environment,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
 
         self._entity = entity
+        self._env = env
 
     # region TODO: @gangjeuk
     # [ ] - check collider, joint, surface exist
@@ -397,7 +443,11 @@ class StuffObject:
     def set_pos(self, pos: RandomizableVec3) -> None: ...
     def set_rot(self, rot: RandomizableVec3) -> None: ...
     def set_size(self, size: RandomizableVec3) -> None: ...
-    def set_fixed(self, is_fixed: RandomizableBool) -> None: ...
+    def set_fixed(self, is_fixed: bool) -> None:
+        self._env._assert_mutable()
+
+        self._entity.fixed = is_fixed
+
     def set_friction(self, friction: RandomizableFloat) -> None: ...
     def set_density(self, density: RandomizableFloat) -> None: ...
 

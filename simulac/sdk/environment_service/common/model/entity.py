@@ -41,7 +41,7 @@ class EnvironmentStuffEntity:
     pos: RandomizableVec3 | PointRefType = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
     size: RandomizableVec3 = (1, 1, 1)
-    fixed: RandomizableBool = True
+    fixed: bool | None = None
     mass: RandomizableFloat | None = None
     friction: RandomizableFloat | None = None
     density: RandomizableFloat | None = None

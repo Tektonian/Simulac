@@ -50,6 +50,8 @@ class IEnvironmentBuildService(ServiceIdentifier["IEnvironmentBuildService"]):
         entity_id: str | None = None,
         pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
+        *,
+        fixed: bool | None = None,
     ) -> str: ...
 
     @abstractmethod
@@ -127,6 +129,8 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         entity_id: str | None = None,
         pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
+        *,
+        fixed: bool | None = None,
     ):
         """TODO: only support local file for now
         1. add remote support http, https
@@ -153,6 +157,11 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         # [ ] - error below will be solved when LightObject is implemented
         entity.pos = pos
         entity.rot = rot
+
+        if fixed is not None:
+            if not isinstance(entity, EnvironmentStuffEntity):
+                raise SimulacBaseError("fixed is only supported for Stuff entities")
+            entity.fixed = fixed
 
         self.__append_entity_to_env(env, entity)
         env_entities.append(entity)
@@ -355,7 +364,7 @@ class EnvironmentBuildService(IEnvironmentBuildService):
             "type": type(entity).__name__,
             "description": entity.description,
             "pos": entity.pos,
-            "quat": entity.quat,
+            "rot": entity.rot,
         }
 
         if isinstance(entity, EnvironmentStuffEntity):
