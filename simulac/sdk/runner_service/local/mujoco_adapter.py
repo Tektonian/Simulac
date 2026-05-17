@@ -80,7 +80,11 @@ from simulac.sdk.runner_service.local.mujoco.runtime import (
     MujocoStuffRuntimeOps,
 )
 
-from .mujoco.resolver import MujocoRefResolver
+from .mujoco.constraint import (
+    MujocoConstraintEvaluation,
+    MujocoConstraintEvaluator,
+)
+from .mujoco.resolver import MujocoPlacementResolver, MujocoRefResolver
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -176,6 +180,7 @@ def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
 class MujocoRunner(IRunner):
     def __init__(
         self,
+        LogService: ILogService,
         runner_id: str,
         env: IEnvironment,
         mj_model: mujoco.MjModel,
@@ -187,6 +192,8 @@ class MujocoRunner(IRunner):
         machine_bindings: dict[str, MujocoRobotBinding],
         on_after_call_step: Callable[[str], None],
     ) -> None:
+        self.LogService = LogService
+
         self.runner_type = "mujoco"
         self.runner_id = runner_id
         self.env = env
@@ -204,8 +211,18 @@ class MujocoRunner(IRunner):
         self._data: mujoco.MjData | None = None
         self.resolver: MujocoRefResolver | None = None
 
-        self.__MAX_RESET_RETRY = 100
+        self.__MAX_RESET_RETRY = 1000
         self.__reset_passed = False
+
+        # Constriant debugging
+        self._reset_failure_count: dict[
+            tuple[str, str, tuple[str, ...], tuple[str, ...]],
+            int,
+        ] = {}
+        self._reset_failure_examples: dict[
+            tuple[str, str, tuple[str, ...], tuple[str, ...]],
+            str,
+        ] = {}
 
     def initialize(self) -> None:
         self._data = mujoco.MjData(self.mj_model)
@@ -283,7 +300,9 @@ class MujocoRunner(IRunner):
         self._clean_runtimes()
 
         retry_count = 0
-        while self.__reset_passed or retry_count <= self.__MAX_RESET_RETRY:
+
+        max_retry = None if self.__reset_passed else self.__MAX_RESET_RETRY
+        while max_retry is None or retry_count <= self.__MAX_RESET_RETRY:
             candidate = self._sampling_candidate(sampler)
 
             mujoco.mj_resetData(self.mj_model, data)
@@ -293,7 +312,54 @@ class MujocoRunner(IRunner):
             mujoco.mj_setConst(self.mj_model, data)
             mujoco.mj_forward(self.mj_model, data)
 
-            if not self._constraints_pass(candidate):
+            evaluation = self._evaluate_constraints()
+
+            if not evaluation.passed:
+                failure_logs: list[str] = []
+                for failure in evaluation.failures:
+                    failure_key = failure.key()
+                    failure_text = failure.format()
+
+                    self._reset_failure_count[failure_key] = (
+                        self._reset_failure_count.get(failure_key, 0) + 1
+                    )
+                    self._reset_failure_examples[failure_key] = failure_text
+
+                    self.LogService.debug(failure_text)
+                    failure_logs.append(failure_text)
+
+                if retry_count >= 100 and retry_count % 100 == 0:
+                    suspicious_failures = sorted(
+                        self._reset_failure_count.items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                    suspicious_lines = [
+                        "---------- Reset sampling warning ----------",
+                        (
+                            f"Reset count is too high: runner={self.runner_id!r}, "
+                            f"environment={self.env.id!r}, retry_count={retry_count}."
+                        ),
+                        (
+                            "The environment has failed to sample a valid reset state many times. "
+                            "This usually means one or more constraints are too strict, "
+                            "objects are initialized in penetration, or the placement randomization "
+                            "does not cover a feasible region."
+                        ),
+                        "---------- Suspicious constraints ----------",
+                        "Most frequent constraint failures:",
+                    ]
+                    for failure_key, count in suspicious_failures[:10]:
+                        example = self._reset_failure_examples[failure_key]
+                        suspicious_lines.append(f"  - count={count}: {example}")
+
+                    suspicious_lines.append("Current retry failures:")
+                    suspicious_lines.extend(
+                        f"  - {failure_text}" for failure_text in failure_logs
+                    )
+
+                    self.LogService.warn("\n".join(suspicious_lines))
+
                 retry_count += 1
                 continue
 
@@ -930,89 +996,18 @@ class MujocoRunner(IRunner):
 
         return obj_id
 
-    def _constraints_pass(self, candidate: dict[str, dict[str, Any]]) -> bool:
-        for eid, values in candidate.items():
-            for c in values.get("constraints", {}).get("pos", []):
-                if not self._constraint_pass(eid, c):
-                    return False
-        return True
-
-    def _constraint_pass(self, eid: str, constraint: _ConstraintSpec) -> bool:
-        typ = constraint["type"]
-
-        if typ == "bbox":
-            return self._bbox_constraint_pass(eid, constraint)
-        if typ == "distance":
-            return self._distance_constraint_pass(constraint)
-        if typ == "nonpenetration":
-            return self._nonpenetration_constraint_pass(constraint)
-
-        raise SimulacBaseError(f"Unsupported constraint: {typ}")
-
-    def _bbox_constraint_pass(self, eid: str, constraint: BboxConstraintSpec):
-        binding = self._entity_binding(eid)
-        pos = self._require_data().xpos[binding.root_body_id]
-
-        lo = constraint["min"]
-        hi = constraint["max"]
-
-        inside = all(float(lo[i]) <= float(pos[i]) <= float(hi[i]) for i in range(3))
-
-        mode = constraint.get("mode", "inside")
-        if mode == "inside":
-            return inside
-
-        if mode == "outside":
-            return not inside
-
-        raise SimulacBaseError(f"Unsupported bbox constraint mode: {mode}")
-
-    def _distance_constraint_pass(self, constraint: DistanceConstraintSpec):
-        a, b = constraint["between"]
-
-        a_binding = self._entity_binding(a)
-        b_binding = self._entity_binding(b)
-
-        data = self._require_data()
-        pa = data.xpos[a_binding.root_body_id]
-        pb = data.xpos[b_binding.root_body_id]
-
-        dx = float(pa[0]) - float(pb[0])
-        dy = float(pa[1]) - float(pb[1])
-        dz = float(pa[2]) - float(pb[2])
-
-        distance = sqrt(dx * dx + dy * dy + dz * dz)
-
-        return float(constraint["min"]) <= distance <= float(constraint["max"])
-
-    def _nonpenetration_constraint_pass(
-        self, constraint: NonpenetrationConstraintSpec
-    ) -> bool:
-        between = constraint["between"]
-        if len(between) < 2:
-            raise SimulacBaseError(
-                "nonpenetration constraint requires at least two entities"
-            )
-
-        for idx, a in enumerate(between):
-            for b in between[idx + 1 :]:
-                if not self._nonpenetration_pair_pass(a, b):
-                    return False
-
-        return True
-
-    def _nonpenetration_pair_pass(self, a: str, b: str) -> bool:
-        data = self._require_data()
-        a_geoms = set(self._entity_binding(a).geom_ids)
-        b_geoms = set(self._entity_binding(b).geom_ids)
-        for i in range(data.ncon):
-            contact = data.contact[i]
-            if contact.dist >= -1e-5:
-                continue
-            g1, g2 = int(contact.geom1), int(contact.geom2)
-            if (g1 in a_geoms and g2 in b_geoms) or (g2 in a_geoms and g1 in b_geoms):
-                return False
-        return True
+    def _evaluate_constraints(self) -> MujocoConstraintEvaluation:
+        evaluator = MujocoConstraintEvaluator(
+            model=self.mj_model,
+            data=self._require_data(),
+            resolver=self.resolver,
+            bindings={
+                **self._stuff_bindings,
+                **self._machine_bindings,
+                **self._camera_bindings,
+            },
+        )
+        return evaluator.evaluate(self.env.constraints)
 
 
 class MujocoAdapter(IPhysicsEngineAdapter):
@@ -1100,8 +1095,9 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         new_runner_id = f"run_{self._runner_count}"
 
         runner = MujocoRunner(
-            new_runner_id,
-            self.env,
+            LogService=self.LogService,
+            runner_id=new_runner_id,
+            env=self.env,
             mj_model=self.model,
             stuff_entities=self._stuff_entities,
             camera_entities=self._camera_entities,
