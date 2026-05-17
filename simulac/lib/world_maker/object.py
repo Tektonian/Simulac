@@ -45,7 +45,6 @@ if TYPE_CHECKING:
         RandomizableVec3,
         Vec3,
     )
-
 from .entity import (
     ActionT,
     AmbientLight,
@@ -114,7 +113,7 @@ class Environment:
     def add_entity(
         self,
         entity: Stuff,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -123,7 +122,7 @@ class Environment:
     def add_entity(
         self,
         entity: Camera,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -132,7 +131,7 @@ class Environment:
     def add_entity(
         self,
         entity: LightType,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -141,7 +140,7 @@ class Environment:
     def add_entity(
         self,
         entity: Robot[ActionT],
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
@@ -149,11 +148,27 @@ class Environment:
     def add_entity(
         self,
         entity: Stuff | Robot[ActionT] | Camera | LightType,
-        pos: RandomizableVec3 = (0, 0, 0),
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
     ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
+        """_summary_
+
+        Args:
+            entity (Stuff | Robot[ActionT] | Camera | LightType): _description_
+            pos (RandomizableVec3, optional): _description_. Defaults to (0, 0, 0).
+            rot (RandomizableVec3, optional): _description_. Defaults to (0, 0, 0).
+            entity_id (str | None, optional): _description_. Defaults to None.
+            description (str | None, optional): _description_. Defaults to None.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            StuffObject | RobotObject[ActionT] | CameraObject | LightObject: _description_
+        """
+
         description = description or ""
 
         if isinstance(entity, Stuff):
@@ -215,6 +230,9 @@ class Environment:
         | LightObject
         | str,
     ) -> None:
+        # TODO: @gangjeuk
+        # [ ] - Remove object
+        # [ ] - Remove relations and constraints connected to object
         pass
 
     def get_object(
@@ -266,6 +284,8 @@ class StuffObject:
 
         self._entity = entity
 
+    # region TODO: @gangjeuk
+    # [ ] - check collider, joint, surface exist
     def collider(self, name: str) -> ColliderRef:
         """When user want to customize collision mesh.
         TODO: @gangjeuk
@@ -366,6 +386,8 @@ class StuffObject:
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return AnchorRef(self._entity.id, name)
+
+    # end-region
 
     def set_mass(self, mass: RandomizableFloat) -> None:
         # do assertion first
