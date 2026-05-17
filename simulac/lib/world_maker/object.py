@@ -24,6 +24,7 @@ from simulac.sdk.environment_service.common.model.ref import (
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
+    from simulac.sdk.environment_service.common.model.constraint import SceneConstraint
     from simulac.sdk.environment_service.common.model.entity import (
         EnvironmentCameraEntity,
         EnvironmentLightEntity,
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
         PointRefType,
     )
     from simulac.sdk.environment_service.common.randomize import (
+        RandomConstraint,
         Randomizable,
         RandomizableBool,
         RandomizableColor,
@@ -195,40 +197,6 @@ class Environment:
         # Should not reach
         raise NotImplementedError("Wrong entity")
 
-    def place_object(
-        self,
-        obj: StuffObject | RobotObject[Any],
-        *,
-        on: PlaceTargetRefType,
-        using: PlaceTargetRefType | None = None,
-        margin: RandomizableFloat = 0.0,
-    ):
-        """
-        # When user want to place something on another thing
-        env.place(
-            mug,
-            on=table.collider("top")
-            using=mug.collider("bottom"),
-            margin=0.04
-        )
-        """
-        self._assert_mutable()
-        if obj._entity.id is None:
-            raise SimulacBaseError("Entity must be added to Environment first")
-
-        # TODO: @gangjeuk
-        # [ ] - verify before place
-        # [o] - change `_entity.build_ops` to `_env.relations`
-
-        self._env.relations.append(
-            PlaceOp(
-                EntityRef(obj._entity.id),
-                as_place_target(on, margin=margin),
-                as_place_source(using),
-                margin,
-            )
-        )
-
     @overload
     def remove_object(
         self,
@@ -268,6 +236,9 @@ class Environment:
                     obj, _create_sentinal=_CREATE_SENTINAL, env=self._env
                 )
         return None
+
+    def constraint(self, *constraints: SceneConstraint) -> None:
+        self._env.constraints.extend(constraints)
 
     def dump_env(self) -> dict:
         """Return definition of environment.
