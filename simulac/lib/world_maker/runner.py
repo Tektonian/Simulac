@@ -66,7 +66,16 @@ class StuffRuntime:
     def change_friction(self, friction: float) -> None:
         self._runtime.change_friction(friction)
 
-    def joint(self, name: str) -> None:
+    @property
+    def id(self) -> str:
+        return self._runtime.id
+
+    def get_pos(self) -> tuple[float, float, float]:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
     def collider(self, name: str) -> ColliderRef:
         return ColliderRef(self._runtime.id, name)
 
