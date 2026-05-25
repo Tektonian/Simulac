@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABCMeta
+from array import array
 from dataclasses import dataclass, field
 from math import sqrt
 from typing import (
@@ -57,6 +58,7 @@ from simulac.sdk.environment_service.common.randomize import (
 )
 from simulac.sdk.runner_service.common.model.runtime import (
     CameraRuntime,
+    ContactResult,
     RobotRuntime,
     StuffRuntime,
 )
@@ -328,6 +330,7 @@ class MujocoRunner(IRunner):
         self.state = {}
         self.on_after_call_step = on_after_call_step
         self._data: mujoco.MjData | None = None
+        self._step_count = 0
         self.resolver: MujocoRefResolver | None = None
         self.placement_resolver: MujocoPlacementResolver | None = None
 
@@ -376,11 +379,15 @@ class MujocoRunner(IRunner):
         data.ctrl[:] = action
         mujoco.mj_step(self.mj_model, data)
         self._apply_follow_ops(self.resolver)
+        self._step_count += 1
         self.on_after_call_step(self.runner_id)
+        return self._runtime_state()
 
     def tick(self) -> RuntimeState:
         mujoco.mj_step(self.mj_model, self._require_data())
         self._apply_follow_ops(self.resolver)
+        self._step_count += 1
+        self.on_after_call_step(self.runner_id)
         return self._runtime_state()
 
     def get_state(self) -> RuntimeState:
@@ -428,6 +435,7 @@ class MujocoRunner(IRunner):
         sampler = ResetSampler(seed)
 
         self._clean_runtimes()
+        self._step_count = 0
 
         retry_count = 0
 

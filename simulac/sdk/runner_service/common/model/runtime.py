@@ -2,7 +2,51 @@ from __future__ import annotations
 
 from typing import Callable, Protocol, runtime_checkable
 class ContactResult:
-    def __init__(self, ops: IRuntimeStateOps, a: object, b: object) -> None: ...
+    def __init__(self, ops: IRuntimeStateOps, a: object, b: object) -> None:
+        self._ops = ops
+        self._a = a
+        self._b = b
+        self._indices: tuple[int, ...] | None = None
+        self._points: tuple[Vec3, ...] | None = None
+        self._normal: Vec3 | None | object = _UNSET
+        self._max_force: float | None | object = _UNSET
+
+    def _contact_indices(self) -> tuple[int, ...]:
+        if self._indices is None:
+            self._indices = self._ops.contact_indices(self._a, self._b)
+        return self._indices
+
+    @property
+    def exists(self) -> bool:
+        return len(self._contact_indices()) > 0
+
+    @property
+    def count(self) -> int:
+        return len(self._contact_indices())
+
+    @property
+    def points(self) -> tuple[Vec3, ...]:
+        if self._points is None:
+            self._points = tuple(
+                self._ops.contact_point(i) for i in self._contact_indices()
+            )
+        return self._points
+
+    @property
+    def normal(self) -> Vec3 | None:
+        if self._normal is _UNSET:
+            indices = self._contact_indices()
+            self._normal = None if not indices else self._ops.contact_normal(indices[0])
+        return self._normal
+
+    @property
+    def max_force(self) -> float | None:
+        if self._max_force is _UNSET:
+            forces = [self._ops.contact_force(i) for i in self._contact_indices()]
+            forces = [f for f in forces if f is not None]
+            self._max_force = None if not forces else max(forces)
+        return self._max_force
+
 
 class IRuntimeStateOps(Protocol):
     def get_time(self) -> float: ...
