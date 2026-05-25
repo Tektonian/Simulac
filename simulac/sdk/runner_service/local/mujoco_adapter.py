@@ -166,6 +166,118 @@ class _EntityCandidate(TypedDict):
 type _ResetCandidate = dict[str, _EntityCandidate]
 
 
+class MujocoRuntimeStateOps:
+    def __init__(
+        self,
+        model: mujoco.MjModel,
+        data: mujoco.MjData,
+        *,
+        step_count: Callable[[], int],
+        stuff_bindings: dict[str, MujocoStuffBinding],
+        machine_bindings: dict[str, MujocoRobotBinding],
+    ) -> None:
+        self._model = model
+        self._data = data
+        self._step_count = step_count
+        self._stuff_bindings = stuff_bindings
+        self._machine_bindings = machine_bindings
+
+    def get_time(self) -> float:
+        return float(self._data.time)
+
+    def get_step_count(self) -> int:
+        return int(self._step_count())
+
+    def contact_indices(self, a: object, b: object) -> tuple[int, ...]:
+        a_geom_ids = self._resolve_geom_ids(a)
+        b_geom_ids = self._resolve_geom_ids(b)
+
+        indices: list[int] = []
+        for contact_idx in range(int(self._data.ncon)):
+            contact = self._data.contact[contact_idx]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+
+            if (geom1 in a_geom_ids and geom2 in b_geom_ids) or (
+                geom2 in a_geom_ids and geom1 in b_geom_ids
+            ):
+                indices.append(contact_idx)
+
+        return tuple(indices)
+
+    def contact_point(self, contact_index: int) -> Vec3:
+        self._validate_contact_index(contact_index)
+        point = self._data.contact[contact_index].pos
+        return (float(point[0]), float(point[1]), float(point[2]))
+
+    def contact_normal(self, contact_index: int) -> Vec3:
+        self._validate_contact_index(contact_index)
+        frame = self._data.contact[contact_index].frame
+        return (float(frame[0]), float(frame[1]), float(frame[2]))
+
+    def contact_force(self, contact_index: int) -> float | None:
+        self._validate_contact_index(contact_index)
+        contact_force = array("d", [0.0] * 6)
+        try:
+            mujoco.mj_contactForce(
+                self._model,
+                self._data,
+                contact_index,
+                contact_force,
+            )
+        except TypeError:
+            return None
+
+        return sqrt(
+            float(contact_force[0]) ** 2
+            + float(contact_force[1]) ** 2
+            + float(contact_force[2]) ** 2
+        )
+
+    def _validate_contact_index(self, contact_index: int) -> None:
+        if contact_index < 0 or contact_index >= int(self._data.ncon):
+            raise SimulacBaseError(
+                f"Contact index {contact_index} is out of range: ncon={self._data.ncon}"
+            )
+
+    def _resolve_geom_ids(self, target: object) -> set[int]:
+        if isinstance(target, ColliderRef):
+            return {self._named_geom_id(target.entity_id, target.name)}
+
+        entity_id = self._entity_id_from_runtime(target)
+        if entity_id is None:
+            raise SimulacBaseError(f"Unsupported contact target: {target!r}")
+
+        binding = self._stuff_bindings.get(entity_id)
+        if binding is not None:
+            return set(binding.geom_ids)
+
+        machine_binding = self._machine_bindings.get(entity_id)
+        if machine_binding is not None:
+            return set(machine_binding.geom_ids)
+
+        raise SimulacBaseError(f"No contact-capable entity named {entity_id!r}")
+
+    def _named_geom_id(self, entity_id: str, name: str) -> int:
+        full_name = f"{entity_id}/{name}"
+        geom_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_GEOM, full_name)
+        if geom_id < 0:
+            raise SimulacBaseError(f"No MuJoCo geom named {full_name!r}")
+        return int(geom_id)
+
+    def _entity_id_from_runtime(self, target: object) -> str | None:
+        entity_id = getattr(target, "id", None)
+        if isinstance(entity_id, str):
+            return entity_id
+
+        runtime = getattr(target, "_runtime", None)
+        runtime_id = getattr(runtime, "id", None)
+        if isinstance(runtime_id, str):
+            return runtime_id
+
+        return None
+
+
 def _subtree_body_ids(model: mujoco.MjModel, root_body_id: int) -> list[int]:
     body_ids: list[int] = []
     for bid in range(model.nbody):
@@ -242,7 +354,18 @@ class MujocoRunner(IRunner):
             raise SimulacBaseError("Runner must be initialized")
         return self._data
 
-    def step(self, action: list[float]) -> None:
+    def _runtime_state(self) -> RuntimeState:
+        return RuntimeState(
+            MujocoRuntimeStateOps(
+                self.mj_model,
+                self._require_data(),
+                step_count=lambda: self._step_count,
+                stuff_bindings=self._stuff_bindings,
+                machine_bindings=self._machine_bindings,
+            )
+        )
+
+    def step(self, action: list[float]) -> RuntimeState:
         data = self._require_data()
         # TODO: @gangjeuk
         # seperate action spaces by each `Robot` instance
@@ -255,15 +378,13 @@ class MujocoRunner(IRunner):
         self._apply_follow_ops(self.resolver)
         self.on_after_call_step(self.runner_id)
 
-    def tick(self) -> None:
+    def tick(self) -> RuntimeState:
         mujoco.mj_step(self.mj_model, self._require_data())
         self._apply_follow_ops(self.resolver)
+        return self._runtime_state()
 
-    # FIXME: debug purpose for now. Should return state info mapped with self._env
-    def get_state(self) -> None:
-        for i in range(self.mj_model.nbody):
-            print(self._data.body(i))
-        breakpoint()
+    def get_state(self) -> RuntimeState:
+        return self._runtime_state()
 
     def get_runtime_object(self, entity_id: str):
         ret = self._runtimes.get(entity_id, None)
@@ -302,7 +423,7 @@ class MujocoRunner(IRunner):
 
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
-    def reset(self, seed: int | None = 0) -> None:
+    def reset(self, seed: int | None = 0) -> RuntimeState:
         data = self._require_data()
         sampler = ResetSampler(seed)
 
@@ -386,8 +507,13 @@ class MujocoRunner(IRunner):
 
             self._create_runtimes()
             self.__reset_passed = True
-            return
+            return self._runtime_state()
         raise SimulacBaseError("Failed to sample valid reset state")
+
+    def sync(self) -> RuntimeState:
+        mujoco.mj_forward(self.mj_model, self._require_data())
+        self._apply_follow_ops(self.resolver)
+        return self._runtime_state()
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)

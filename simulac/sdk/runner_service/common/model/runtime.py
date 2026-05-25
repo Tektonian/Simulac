@@ -1,6 +1,33 @@
 from __future__ import annotations
 
 from typing import Callable, Protocol, runtime_checkable
+class ContactResult:
+    def __init__(self, ops: IRuntimeStateOps, a: object, b: object) -> None: ...
+
+class IRuntimeStateOps(Protocol):
+    def get_time(self) -> float: ...
+    def get_step_count(self) -> int: ...
+
+    def contact_indices(self, a: object, b: object) -> tuple[int, ...]: ...
+    def contact_point(self, contact_index: int) -> Vec3: ...
+    def contact_normal(self, contact_index: int) -> Vec3: ...
+    def contact_force(self, contact_index: int) -> float | None: ...
+
+
+class RuntimeState:
+    def __init__(self, ops: IRuntimeStateOps) -> None:
+        self._ops = ops
+
+    @property
+    def time(self) -> float:
+        return self._ops.get_time()
+
+    @property
+    def step_count(self) -> int:
+        return self._ops.get_step_count()
+
+    def contacts(self, a: object, b: object) -> ContactResult:
+        return ContactResult(self._ops, a, b)
 
 
 @runtime_checkable

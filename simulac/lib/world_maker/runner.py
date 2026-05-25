@@ -6,6 +6,7 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
+from simulac.sdk.runner_service.common.model.runtime import RuntimeState
 
 from .entity import ActionT
 from .object import (
@@ -197,51 +198,8 @@ class ParallelRunner:
 
     def at(self, idx: int) -> Runner: ...
 
-    def get_state(self) -> object: ...
-
     def __len__(self) -> int: ...
     def __getitem__(self, idx: int) -> Runner: ...
-
-
-class RuntimeState:
-    def __init__(self):
-        """Runtime state returned by `runner.step(action)`
-        Remember that Simulac MUST NOT determine the end conditon of runner.
-        Finishing runner is reponsible for user and this way is more fitable with philosophy of the Simulac.
-        However, we should provide detailed information about running state to users to make them control end conditions.
-
-        Example:
-            # Expected usage pattern
-            for _ in range(300):
-                state = runner.step(action)
-
-                # state SHOULD NOT contain information about `contact`
-                # contact info only returned when `state.contacts()` called
-                mug_on_table = state.contracts(
-                    mug.collider("bottom"),
-                    table.collider("top")
-                )
-
-                # details
-                if mug_on_table:
-                    print(mug_on_table.exists)
-                    print(mug_on_table.count)
-                    print(mug_on_table.max_force)
-                    print(mug_on_table.points)
-                    print(mug_on_table.normal)
-
-                # Don't get confused, drawer is NOT runtime object, MUST BE StuffObject
-                drawer_open = state.joint(drawer.joint("slide")).pos > 0.25
-
-                runtime_drawer = runner.get_runtime_object(drawer)
-                # difference between `runtime_drawer` and state.joint(drawer.joint("slide")) is
-                # that `state.joint()` is readonly property, while `runtime_drawer` is mutable
-                assert state.joint(drawer.joint("slide")).pos == runtime_drawer.pos
-
-                if mug_on_table and drawer_open:
-                    print("Happy! Happy! https://upload.wikimedia.org/wikipedia/commons/0/04/So_happy_smiling_cat.jpg")
-                    break
-        """
 
 
 class Runner:
@@ -270,15 +228,18 @@ class Runner:
     # def step(self, action: list[float]) -> RuntimeState:
     #     return self._runner.step(action)
 
-    def tick(self):
-        self._runner.tick()
+    def tick(self) -> RuntimeState:
+        return self._runner.tick()
 
-    type State = Any
+    def reset(self, seed: int | None = 0) -> RuntimeState:
+        return self._runner.reset(seed)
 
-    def reset(self, seed: int | None = 0) -> State:
-        self._runner.reset(seed)
+    def sync(self) -> RuntimeState:
+        return self._runner.sync()
 
-    def get_state(self): ...
+    @property
+    def state(self) -> RuntimeState:
+        return self._runner.get_state()
 
     @overload
     def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...
