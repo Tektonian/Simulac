@@ -73,7 +73,7 @@ class IFileSystemProvider(ABC):
 
     @abstractmethod
     def write_file(
-        self, uri: urllib.parse.SplitResult, opts: IFileWriteOption
+        self, uri: urllib.parse.SplitResult, data: bytes, opts: IFileWriteOption
     ) -> ResultType[bool, BaseException]: ...
 
     @abstractmethod
