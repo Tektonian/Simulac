@@ -219,6 +219,190 @@ class MujocoRobotRuntimeOps(IRobotRuntimeOps):
 
         return values
 
+    def get_joint_type(self, name: str):
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+            return "hinge"
+        if joint_type == mujoco.mjtJoint.mjJNT_SLIDE:
+            return "slide"
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            return "ball"
+        if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            return "free"
+        raise SimulacBaseError(f"Unsupported MuJoCo joint type: {joint_type}")
+
+    def get_joint_scalar_pos(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qpos[joint.qpos_addr])
+
+    def get_joint_scalar_vel(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qvel[joint.qvel_addr])
+
+    def get_joint_free_pos(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type != mujoco.mjtJoint.mjJNT_FREE:
+            raise SimulacBaseError(f"Joint {name!r} is not a free joint")
+        pos = self._data.qpos[joint.qpos_addr : joint.qpos_addr + 3]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_joint_quat(self, name: str) -> tuple[float, float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            quat_wxyz = self._data.qpos[joint.qpos_addr : joint.qpos_addr + 4]
+        elif joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            quat_wxyz = self._data.qpos[joint.qpos_addr + 3 : joint.qpos_addr + 7]
+        else:
+            raise SimulacBaseError(f"Joint {name!r} has no quaternion state")
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def get_joint_linear_vel(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type != mujoco.mjtJoint.mjJNT_FREE:
+            raise SimulacBaseError(f"Joint {name!r} has no linear velocity vector")
+        linear_vel = self._data.qvel[joint.qvel_addr : joint.qvel_addr + 3]
+        return (float(linear_vel[0]), float(linear_vel[1]), float(linear_vel[2]))
+
+    def get_joint_angular_vel(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            angular_vel = self._data.qvel[joint.qvel_addr : joint.qvel_addr + 3]
+        elif joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            angular_vel = self._data.qvel[joint.qvel_addr + 3 : joint.qvel_addr + 6]
+        else:
+            raise SimulacBaseError(f"Joint {name!r} has no angular velocity vector")
+        return (
+            float(angular_vel[0]),
+            float(angular_vel[1]),
+            float(angular_vel[2]),
+        )
+
+    def get_joint_axis(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return joint.axis
+
+    def get_joint_limited(self, name: str) -> bool:
+        joint = self.__require_joint(name)
+        return bool(self._model.jnt_limited[joint.joint_id])
+
+    def get_joint_range(self, name: str) -> tuple[float, float] | None:
+        joint = self.__require_joint(name)
+        if not bool(self._model.jnt_limited[joint.joint_id]):
+            return None
+        return (
+            float(self._model.jnt_range[joint.joint_id][0]),
+            float(self._model.jnt_range[joint.joint_id][1]),
+        )
+
+    def get_site_pos(self, name):
+        full_name = f"{self.id}/{name}"
+        site_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, full_name)
+        if site_id < 0:
+            raise SimulacBaseError(f"No site {name!r} on robot {self.id!r}")
+        pos = self._data.site_xpos[site_id]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_site_quat(self, name: str) -> tuple[float, float, float, float]:
+        full_name = f"{self.id}/{name}"
+        site_id = mujoco.mj_name2id(
+            self._model,
+            mujoco.mjtObj.mjOBJ_SITE,
+            full_name,
+        )
+        if site_id < 0:
+            raise SimulacBaseError(f"No site {name!r} on robot {self.id!r}")
+
+        quat_wxyz = [0.0, 0.0, 0.0, 0.0]
+        mujoco.mju_mat2Quat(quat_wxyz, self._data.site_xmat[site_id])
+
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def get_site_linear_vel(self, name: str) -> tuple[float, float, float]:
+        site_id = self.__require_site_id(name)
+        vel = self._object_velocity(mujoco.mjtObj.mjOBJ_SITE, site_id)
+        return (
+            float(vel[3]),
+            float(vel[4]),
+            float(vel[5]),
+        )
+
+    def get_site_angular_vel(self, name: str) -> tuple[float, float, float]:
+        site_id = self.__require_site_id(name)
+        vel = self._object_velocity(mujoco.mjtObj.mjOBJ_SITE, site_id)
+        return (
+            float(vel[0]),
+            float(vel[1]),
+            float(vel[2]),
+        )
+
+    def get_link_pos(self, name: str) -> tuple[float, float, float]:
+        link = self._binding.links.get(name)
+        if link is None:
+            known = ", ".join(sorted(self._binding.links)) or "<none>"
+            raise SimulacBaseError(
+                f"No link {name!r} on robot {self.id!r}. Known links: {known}"
+            )
+
+        pos = self._data.xpos[link.body_id]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_link_quat(self, name: str) -> tuple[float, float, float, float]:
+        link = self._binding.links.get(name)
+        if link is None:
+            known = ", ".join(sorted(self._binding.links)) or "<none>"
+            raise SimulacBaseError(
+                f"No link {name!r} on robot {self.id!r}. Known links: {known}"
+            )
+
+        quat_wxyz = self._data.xquat[link.body_id]
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def get_link_linear_vel(self, name: str) -> tuple[float, float, float]:
+        link = self.__require_link(name)
+        vel = self._object_velocity(mujoco.mjtObj.mjOBJ_BODY, link.body_id)
+        return (
+            float(vel[3]),
+            float(vel[4]),
+            float(vel[5]),
+        )
+
+    def get_link_angular_vel(self, name: str) -> tuple[float, float, float]:
+        link = self.__require_link(name)
+        vel = self._object_velocity(mujoco.mjtObj.mjOBJ_BODY, link.body_id)
+        return (
+            float(vel[0]),
+            float(vel[1]),
+            float(vel[2]),
+        )
+
+    def get_joint_force(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qfrc_actuator[joint.qvel_addr])
+
     def change_joint_pos(self, joint_pos: list[float]) -> None:
         cursor = 0
 
@@ -319,6 +503,41 @@ class MujocoRobotRuntimeOps(IRobotRuntimeOps):
         if joint_type == mujoco.mjtJoint.mjJNT_BALL:
             return 4, 3
         return 1, 1
+
+    def __require_joint(self, name: str):
+        joint = self._binding.joints.get(name)
+        if joint is None:
+            known = ", ".join(sorted(self._binding.joints)) or "<none>"
+            raise SimulacBaseError(
+                f"No joint {name!r} on robot {self.id!r}. Known joints: {known}"
+            )
+        return joint
+
+    def __require_link(self, name: str):
+        link = self._binding.links.get(name)
+        if link is None:
+            known = ", ".join(sorted(self._binding.links)) or "<none>"
+            raise SimulacBaseError(
+                f"No link {name!r} on robot {self.id!r}. Known links: {known}"
+            )
+        return link
+
+    def __require_site_id(self, name: str) -> int:
+        full_name = f"{self.id}/{name}"
+        site_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, full_name)
+        if site_id < 0:
+            raise SimulacBaseError(f"No site {name!r} on robot {self.id!r}")
+        return site_id
+
+    def __require_scalar_joint(self, name: str, joint_id: int) -> None:
+        joint_type = int(self._model.jnt_type[joint_id])
+        if joint_type not in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
+            raise SimulacBaseError(f"Joint {name!r} has no scalar position/velocity")
+
+    def _object_velocity(self, obj_type: mujoco.mjtObj, obj_id: int):
+        vel = self._data.cvel[0].copy()
+        mujoco.mj_objectVelocity(self._model, self._data, obj_type, obj_id, vel, 0)
+        return vel
 
 
 class MujocoCameraRuntimeOps(ICameraRuntimeOps):
