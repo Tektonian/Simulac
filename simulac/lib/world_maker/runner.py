@@ -6,6 +6,10 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
+from simulac.sdk.environment_service.common.model.ref import (
+    ColliderRef,
+)
+from simulac.sdk.runner_service.common.model.runtime import RuntimeState
 
 from .entity import ActionT
 from .object import (
@@ -18,6 +22,14 @@ from .object import (
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.runner_service.common.model.runtime import (
+        BallJointState,
+        FreeJointState,
+        HingeJointState,
+        LinkState,
+        SiteState,
+        SlideJointState,
+    )
     from simulac.sdk.runner_service.common.model.runtime import (
         CameraRuntime as SDKCameraRuntime,
     )
@@ -54,7 +66,22 @@ class StuffRuntime:
     def change_friction(self, friction: float) -> None:
         self._runtime.change_friction(friction)
 
-    def joint(self, name: str) -> None:
+    @property
+    def id(self) -> str:
+        return self._runtime.id
+
+    def get_pos(self) -> tuple[float, float, float]:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def collider(self, name: str) -> ColliderRef:
+        return ColliderRef(self._runtime.id, name)
+
+    def joint(
+        self, name: str
+    ) -> SlideJointState | HingeJointState | BallJointState | FreeJointState:
         """Runtime joint control
         See object.py:StuffObject
         TODO: @gangjeuk
@@ -82,11 +109,12 @@ class RobotRuntime(Generic[ActionT]):
             raise SimulacBaseError("Please do not create robot runtime directly")
         self._runtime = runtime_object
 
-    def step(self, action: ActionT) -> None:
-        self._runtime.step(list(action))
+    def set_control(self, action: ActionT) -> None:
+        self._runtime.set_control(list(action))
 
-    def tick(self) -> None:
-        self._runtime.tick()
+    @property
+    def id(self) -> str:
+        return self._runtime.id
 
     def get_pos(self) -> Vec3:
         return self._runtime.get_pos()
@@ -99,6 +127,20 @@ class RobotRuntime(Generic[ActionT]):
 
     def get_joint_vel(self) -> list[float]:
         return self._runtime.get_joint_vel()
+
+    def site(self, name: str) -> SiteState:
+        return self._runtime.site(name)
+
+    def link(self, name: str) -> LinkState:
+        return self._runtime.link(name)
+
+    def joint(
+        self, name: str
+    ) -> HingeJointState | SlideJointState | BallJointState | FreeJointState:
+        return self._runtime.joint(name)
+
+    def collider(self, name: str) -> ColliderRef:
+        return ColliderRef(self._runtime.id, name)
 
     def change_joint_pos(self, joint_pos: list[float]) -> None:
         self._runtime.change_joint_pos(joint_pos)
@@ -197,51 +239,8 @@ class ParallelRunner:
 
     def at(self, idx: int) -> Runner: ...
 
-    def get_state(self) -> object: ...
-
     def __len__(self) -> int: ...
     def __getitem__(self, idx: int) -> Runner: ...
-
-
-class RuntimeState:
-    def __init__(self):
-        """Runtime state returned by `runner.step(action)`
-        Remember that Simulac MUST NOT determine the end conditon of runner.
-        Finishing runner is reponsible for user and this way is more fitable with philosophy of the Simulac.
-        However, we should provide detailed information about running state to users to make them control end conditions.
-
-        Example:
-            # Expected usage pattern
-            for _ in range(300):
-                state = runner.step(action)
-
-                # state SHOULD NOT contain information about `contact`
-                # contact info only returned when `state.contacts()` called
-                mug_on_table = state.contracts(
-                    mug.collider("bottom"),
-                    table.collider("top")
-                )
-
-                # details
-                if mug_on_table:
-                    print(mug_on_table.exists)
-                    print(mug_on_table.count)
-                    print(mug_on_table.max_force)
-                    print(mug_on_table.points)
-                    print(mug_on_table.normal)
-
-                # Don't get confused, drawer is NOT runtime object, MUST BE StuffObject
-                drawer_open = state.joint(drawer.joint("slide")).pos > 0.25
-
-                runtime_drawer = runner.get_runtime_object(drawer)
-                # difference between `runtime_drawer` and state.joint(drawer.joint("slide")) is
-                # that `state.joint()` is readonly property, while `runtime_drawer` is mutable
-                assert state.joint(drawer.joint("slide")).pos == runtime_drawer.pos
-
-                if mug_on_table and drawer_open:
-                    print("Happy! Happy! https://upload.wikimedia.org/wikipedia/commons/0/04/So_happy_smiling_cat.jpg")
-                    break
-        """
 
 
 class Runner:
@@ -266,18 +265,22 @@ class Runner:
         # Freeze and prevent changes in env
         env._freeze()
 
-    def step(self, action: list[float]):
-        self._runner.step(action)
+    # Replaced with RobotRuntime.set_control
+    # def step(self, action: list[float]) -> RuntimeState:
+    #     return self._runner.step(action)
 
-    def tick(self):
-        self._runner.tick()
+    def tick(self) -> RuntimeState:
+        return self._runner.tick()
 
-    type State = Any
+    def reset(self, seed: int | None = 0) -> RuntimeState:
+        return self._runner.reset(seed)
 
-    def reset(self, seed: int | None = 0) -> State:
-        self._runner.reset(seed)
+    def sync(self) -> RuntimeState:
+        return self._runner.sync()
 
-    def get_state(self): ...
+    @property
+    def state(self) -> RuntimeState:
+        return self._runner.get_state()
 
     @overload
     def get_runtime_object(self, obj: StuffObject) -> StuffRuntime: ...

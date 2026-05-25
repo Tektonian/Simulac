@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, overload
 
 if TYPE_CHECKING:
-    from .model.runtime import RobotRuntime, StuffRuntime
+    from .model.runtime import RobotRuntime, RuntimeState, StuffRuntime
 
 
 @dataclass
@@ -21,22 +21,24 @@ class IRunner(ABC):
     def initialize(self) -> None: ...
 
     @abstractmethod
-    def step(self, action: list[float]) -> None:
+    def step(self, action: list[float]) -> RuntimeState:
         pass
 
     @abstractmethod
-    def tick(self) -> None: ...
+    def tick(self) -> RuntimeState: ...
 
     @abstractmethod
-    def reset(self, seed: int | None = 0) -> None: ...
+    def reset(self, seed: int | None = 0) -> RuntimeState: ...
+
+    @abstractmethod
+    def sync(self) -> RuntimeState: ...
 
     @abstractmethod
     def set_state(self) -> None:
         pass
 
     @abstractmethod
-    def get_state(self) -> None:
-        pass
+    def get_state(self) -> RuntimeState: ...
 
     @abstractmethod
     def get_runtime_object(self, entity_id: str) -> StuffRuntime | RobotRuntime: ...
