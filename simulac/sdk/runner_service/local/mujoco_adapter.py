@@ -60,6 +60,7 @@ from simulac.sdk.runner_service.common.model.runtime import (
     CameraRuntime,
     ContactResult,
     RobotRuntime,
+    RuntimeState,
     StuffRuntime,
 )
 from simulac.sdk.runner_service.common.physics_engine_adapter import (
@@ -1320,7 +1321,18 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             )
 
         root = roots[0]
+        root_name = root.name
         root.name = "__root__"
+
+        # Rename body references
+        if root_name and root_name != root.name:
+            # flexcomp expands into a flex whose vertices reference generated body
+            # names. If the root body is renamed, these references must follow it.
+            for flex in child.flexes:
+                for body_refs in (flex.vertbody, flex.nodebody):
+                    for idx in range(len(body_refs)):
+                        if body_refs[idx] == root_name:
+                            body_refs[idx] = root.name
 
         root_freejoints: list[mujoco.MjsJoint] = [
             joint
