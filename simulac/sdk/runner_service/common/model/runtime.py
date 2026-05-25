@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from typing import Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, runtime_checkable
+
+if TYPE_CHECKING:
+    from simulac.base.types.geometry import Quat, Vec3
+
 class ContactResult:
     def __init__(self, ops: IRuntimeStateOps, a: object, b: object) -> None:
         self._ops = ops
@@ -76,13 +81,13 @@ class RuntimeState:
 
 @runtime_checkable
 class IStuffRuntimeOps(Protocol):
-    def get_pos(self) -> tuple[float, float, float]: ...
-    def get_quat(self) -> tuple[float, float, float, float]: ...
+    def get_pos(self) -> Vec3: ...
+    def get_quat(self) -> Quat: ...
     def get_mass(self) -> float: ...
     def get_friction(self) -> float: ...
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None: ...
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None: ...
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_quat(self, quat: Quat) -> None: ...
     def change_mass(self, mass: float) -> None: ...
     def change_friction(self, friction: float) -> None: ...
 
@@ -92,10 +97,10 @@ class StuffRuntime:
         self.id = entity_id
         self._ops = ops
 
-    def get_pos(self) -> tuple[float, float, float]:
+    def get_pos(self) -> Vec3:
         return self._ops.get_pos()
 
-    def get_quat(self) -> tuple[float, float, float, float]:
+    def get_quat(self) -> Quat:
         return self._ops.get_quat()
 
     def get_mass(self) -> float:
@@ -104,10 +109,10 @@ class StuffRuntime:
     def get_friction(self) -> float:
         return self._ops.get_friction()
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None:
+    def change_pos(self, pos: Vec3) -> None:
         self._ops.change_pos(pos)
 
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None:
+    def change_quat(self, quat: Quat) -> None:
         self._ops.change_quat(quat)
 
     def change_mass(self, mass: float) -> None:
@@ -137,10 +142,10 @@ class RobotRuntime:
         self.id = entity_id
         self._ops = ops
 
-    def get_pos(self) -> tuple[float, float, float]:
+    def get_pos(self) -> Vec3:
         return self._ops.get_base_pos()
 
-    def get_quat(self) -> tuple[float, float, float, float]:
+    def get_quat(self) -> Quat:
         return self._ops.get_base_quat()
 
     def get_joint_pos(self) -> list[float]:
@@ -181,11 +186,11 @@ class RobotLinkRuntime:
 
 
 class ICameraRuntimeOps(Protocol):
-    def get_pos(self) -> tuple[float, float, float]: ...
-    def get_quat(self) -> tuple[float, float, float, float]: ...
+    def get_pos(self) -> Vec3: ...
+    def get_quat(self) -> Quat: ...
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None: ...
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None: ...
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_quat(self, quat: Quat) -> None: ...
 
     def get_fov(self) -> float: ...
     def change_fov(self, fov: float) -> None: ...
@@ -196,16 +201,16 @@ class CameraRuntime:
         self.id = entity_id
         self._ops = ops
 
-    def get_pos(self) -> tuple[float, float, float]:
+    def get_pos(self) -> Vec3:
         return self._ops.get_pos()
 
-    def get_quat(self) -> tuple[float, float, float, float]:
+    def get_quat(self) -> Quat:
         return self._ops.get_quat()
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None:
+    def change_pos(self, pos: Vec3) -> None:
         self._ops.change_pos(pos)
 
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None:
+    def change_quat(self, quat: Quat) -> None:
         self._ops.change_quat(quat)
 
     def get_fov(self) -> float:
@@ -216,11 +221,11 @@ class CameraRuntime:
 
 
 class ILightRuntimeOps(Protocol):
-    def get_pos(self) -> tuple[float, float, float]: ...
-    def get_quat(self) -> tuple[float, float, float, float]: ...
+    def get_pos(self) -> Vec3: ...
+    def get_quat(self) -> Quat: ...
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None: ...
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None: ...
+    def change_pos(self, pos: Vec3) -> None: ...
+    def change_quat(self, quat: Quat) -> None: ...
 
     def get_color(self) -> tuple[float, float, float]: ...
     def change_color(self, color: tuple[float, float, float]) -> None: ...
@@ -240,5 +245,5 @@ class IAreaLightRuntimeOps(Protocol):
 
 
 class IDirectionalLightRuntimeOps(Protocol):
-    def get_direction(self) -> tuple[float, float, float]: ...
-    def change_direction(self, direction: tuple[float, float, float]) -> None: ...
+    def get_direction(self) -> Vec3: ...
+    def change_direction(self, direction: Vec3) -> None: ...
