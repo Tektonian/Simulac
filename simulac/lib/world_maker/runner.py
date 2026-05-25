@@ -82,8 +82,8 @@ class RobotRuntime(Generic[ActionT]):
             raise SimulacBaseError("Please do not create robot runtime directly")
         self._runtime = runtime_object
 
-    def step(self, action: ActionT) -> None:
-        self._runtime.step(list(action))
+    def set_control(self, action: ActionT) -> None:
+        self._runtime.set_control(list(action))
 
     def tick(self) -> None:
         self._runtime.tick()
@@ -266,8 +266,9 @@ class Runner:
         # Freeze and prevent changes in env
         env._freeze()
 
-    def step(self, action: list[float]):
-        self._runner.step(action)
+    # Replaced with RobotRuntime.set_control
+    # def step(self, action: list[float]) -> RuntimeState:
+    #     return self._runner.step(action)
 
     def tick(self):
         self._runner.tick()

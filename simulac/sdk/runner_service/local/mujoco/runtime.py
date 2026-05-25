@@ -281,6 +281,9 @@ class MujocoRobotRuntimeOps(IRobotRuntimeOps):
             self.__validate_ctrl(actuator_id, ctrl)
             self._data.ctrl[actuator_id] = ctrl
 
+    def set_control(self, action: list[float]) -> None:
+        self._set_action(action)
+
     def step(self, action: list[float]) -> None:
         self._set_action(action)
         mujoco.mj_step(self._model, self._data)
