@@ -6,6 +6,9 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
+from simulac.sdk.environment_service.common.model.ref import (
+    ColliderRef,
+)
 from simulac.sdk.runner_service.common.model.runtime import RuntimeState
 
 from .entity import ActionT
@@ -19,6 +22,14 @@ from .object import (
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.runner_service.common.model.runtime import (
+        BallJointState,
+        FreeJointState,
+        HingeJointState,
+        LinkState,
+        SiteState,
+        SlideJointState,
+    )
     from simulac.sdk.runner_service.common.model.runtime import (
         CameraRuntime as SDKCameraRuntime,
     )
@@ -56,6 +67,12 @@ class StuffRuntime:
         self._runtime.change_friction(friction)
 
     def joint(self, name: str) -> None:
+    def collider(self, name: str) -> ColliderRef:
+        return ColliderRef(self._runtime.id, name)
+
+    def joint(
+        self, name: str
+    ) -> SlideJointState | HingeJointState | BallJointState | FreeJointState:
         """Runtime joint control
         See object.py:StuffObject
         TODO: @gangjeuk
@@ -86,8 +103,9 @@ class RobotRuntime(Generic[ActionT]):
     def set_control(self, action: ActionT) -> None:
         self._runtime.set_control(list(action))
 
-    def tick(self) -> None:
-        self._runtime.tick()
+    @property
+    def id(self) -> str:
+        return self._runtime.id
 
     def get_pos(self) -> Vec3:
         return self._runtime.get_pos()
@@ -100,6 +118,20 @@ class RobotRuntime(Generic[ActionT]):
 
     def get_joint_vel(self) -> list[float]:
         return self._runtime.get_joint_vel()
+
+    def site(self, name: str) -> SiteState:
+        return self._runtime.site(name)
+
+    def link(self, name: str) -> LinkState:
+        return self._runtime.link(name)
+
+    def joint(
+        self, name: str
+    ) -> HingeJointState | SlideJointState | BallJointState | FreeJointState:
+        return self._runtime.joint(name)
+
+    def collider(self, name: str) -> ColliderRef:
+        return ColliderRef(self._runtime.id, name)
 
     def change_joint_pos(self, joint_pos: list[float]) -> None:
         self._runtime.change_joint_pos(joint_pos)

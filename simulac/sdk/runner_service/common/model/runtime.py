@@ -1,10 +1,180 @@
 from __future__ import annotations
 
-from typing import Callable, Protocol, runtime_checkable
 from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, runtime_checkable
 
 if TYPE_CHECKING:
     from simulac.base.types.geometry import Quat, Vec3
+
+
+class LinkState:
+    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+        self._ops = ops
+        self.name = name
+
+    @property
+    def pos(self) -> Vec3:
+        return self._ops.get_link_pos(self.name)
+
+    @property
+    def quat(self) -> Quat:
+        return self._ops.get_link_quat(self.name)
+
+    @property
+    def rot(self) -> Quat:
+        return self.quat
+
+    @property
+    def linear_vel(self) -> Vec3:
+        return self._ops.get_link_linear_vel(self.name)
+
+    @property
+    def angular_vel(self) -> Vec3:
+        return self._ops.get_link_angular_vel(self.name)
+
+
+class SiteState:
+    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+        self._ops = ops
+        self.name = name
+
+    @property
+    def pos(self) -> Vec3:
+        return self._ops.get_site_pos(self.name)
+
+    @property
+    def quat(self) -> Quat:
+        return self._ops.get_site_quat(self.name)
+
+    @property
+    def rot(self) -> Quat:
+        return self.quat
+
+    @property
+    def linear_vel(self) -> Vec3:
+        return self._ops.get_site_linear_vel(self.name)
+
+    @property
+    def angular_vel(self) -> Vec3:
+        return self._ops.get_site_angular_vel(self.name)
+
+
+class _JointStateBase:
+    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+        self._ops = ops
+        self.name = name
+
+
+class HingeJointState(_JointStateBase):
+    @property
+    def type(self) -> Literal["hinge"]:
+        return "hinge"
+
+    @property
+    def pos(self) -> float:
+        return self._ops.get_joint_scalar_pos(self.name)
+
+    @property
+    def vel(self) -> float:
+        return self._ops.get_joint_scalar_vel(self.name)
+
+    @property
+    def axis(self) -> Vec3:
+        return self._ops.get_joint_axis(self.name)
+
+    @property
+    def limited(self) -> bool:
+        return self._ops.get_joint_limited(self.name)
+
+    @property
+    def range(self) -> tuple[float, float] | None:
+        return self._ops.get_joint_range(self.name)
+
+    @property
+    def force(self) -> float:
+        return self._ops.get_joint_force(self.name)
+
+
+class SlideJointState(_JointStateBase):
+    @property
+    def type(self) -> Literal["slide"]:
+        return "slide"
+
+    @property
+    def pos(self) -> float:
+        return self._ops.get_joint_scalar_pos(self.name)
+
+    @property
+    def vel(self) -> float:
+        return self._ops.get_joint_scalar_vel(self.name)
+
+    @property
+    def axis(self) -> Vec3:
+        return self._ops.get_joint_axis(self.name)
+
+    @property
+    def limited(self) -> bool:
+        return self._ops.get_joint_limited(self.name)
+
+    @property
+    def range(self) -> tuple[float, float] | None:
+        return self._ops.get_joint_range(self.name)
+
+    @property
+    def force(self) -> float:
+        return self._ops.get_joint_force(self.name)
+
+
+class BallJointState(_JointStateBase):
+    @property
+    def type(self) -> Literal["ball"]:
+        return "ball"
+
+    @property
+    def quat(self) -> Quat:
+        return self._ops.get_joint_quat(self.name)
+
+    @property
+    def rot(self) -> Quat:
+        return self.quat
+
+    @property
+    def angular_vel(self) -> Vec3:
+        return self._ops.get_joint_angular_vel(self.name)
+
+
+class FreeJointState(_JointStateBase):
+    @property
+    def type(self) -> Literal["free"]:
+        return "free"
+
+    @property
+    def pos(self) -> Vec3:
+        return self._ops.get_joint_free_pos(self.name)
+
+    @property
+    def quat(self) -> Quat:
+        return self._ops.get_joint_quat(self.name)
+
+    @property
+    def rot(self) -> Quat:
+        return self.quat
+
+    @property
+    def linear_vel(self) -> Vec3:
+        return self._ops.get_joint_linear_vel(self.name)
+
+    @property
+    def angular_vel(self) -> Vec3:
+        return self._ops.get_joint_angular_vel(self.name)
+
+
+JointState: TypeAlias = (
+    HingeJointState | SlideJointState | BallJointState | FreeJointState
+)
+
+
+_UNSET = object()
+
 
 class ContactResult:
     def __init__(self, ops: IRuntimeStateOps, a: object, b: object) -> None:
@@ -123,18 +293,40 @@ class StuffRuntime:
 
 
 class IRobotRuntimeOps(Protocol):
-    # below two are for mobile robot or floating boat
-    def get_base_pos(self) -> tuple[float, float, float]: ...
-    def get_base_quat(self) -> tuple[float, float, float, float]: ...
+    def get_base_pos(self) -> Vec3: ...
+    def get_base_quat(self) -> Quat: ...
 
     def get_joint_pos(self) -> list[float]: ...
     def get_joint_vel(self) -> list[float]: ...
 
+    def get_joint_type(
+        self,
+        name: str,
+    ) -> Literal["hinge", "slide", "ball", "free"]: ...
+    def get_joint_scalar_pos(self, name: str) -> float: ...
+    def get_joint_scalar_vel(self, name: str) -> float: ...
+    def get_joint_free_pos(self, name: str) -> Vec3: ...
+    def get_joint_quat(self, name: str) -> Quat: ...
+    def get_joint_linear_vel(self, name: str) -> Vec3: ...
+    def get_joint_angular_vel(self, name: str) -> Vec3: ...
+    def get_joint_axis(self, name: str) -> Vec3: ...
+    def get_joint_limited(self, name: str) -> bool: ...
+    def get_joint_range(self, name: str) -> tuple[float, float] | None: ...
+    def get_joint_force(self, name: str) -> float: ...
+
+    def get_site_pos(self, name: str) -> Vec3: ...
+    def get_site_quat(self, name: str) -> Quat: ...
+    def get_site_linear_vel(self, name: str) -> Vec3: ...
+    def get_site_angular_vel(self, name: str) -> Vec3: ...
+
+    def get_link_pos(self, name: str) -> Vec3: ...
+    def get_link_quat(self, name: str) -> Quat: ...
+    def get_link_linear_vel(self, name: str) -> Vec3: ...
+    def get_link_angular_vel(self, name: str) -> Vec3: ...
+
     def change_joint_pos(self, joint_pos: list[float]) -> None: ...
     def change_joint_vel(self, joint_vel: list[float]) -> None: ...
-
-    def step(self, action: list[float]) -> None: ...
-    def tick(self) -> None: ...
+    def set_control(self, action: list[float]) -> None: ...
 
 
 class RobotRuntime:
@@ -154,35 +346,42 @@ class RobotRuntime:
     def get_joint_vel(self) -> list[float]:
         return self._ops.get_joint_vel()
 
+    def joint(self, name: str) -> JointState:
+        joint_type = self._ops.get_joint_type(name)
+        if joint_type == "hinge":
+            return HingeJointState(self._ops, name)
+        if joint_type == "slide":
+            return SlideJointState(self._ops, name)
+        if joint_type == "ball":
+            return BallJointState(self._ops, name)
+        return FreeJointState(self._ops, name)
+
+    def site(self, name: str) -> SiteState:
+        return SiteState(self._ops, name)
+
+    def link(self, name: str) -> LinkState:
+        return LinkState(self._ops, name)
+
+    def get_site_pos(self, name: str) -> Vec3:
+        return self._ops.get_site_pos(name)
+
+    def get_site_quat(self, name: str) -> Quat:
+        return self._ops.get_site_quat(name)
+
+    def get_link_pos(self, name: str) -> Vec3:
+        return self._ops.get_link_pos(name)
+
+    def get_link_quat(self, name: str) -> Quat:
+        return self._ops.get_link_quat(name)
+
     def change_joint_pos(self, joint_pos: list[float]) -> None:
         self._ops.change_joint_pos(joint_pos)
 
     def change_joint_vel(self, joint_vel: list[float]) -> None:
         self._ops.change_joint_vel(joint_vel)
 
-    def step(self, action: list[float]) -> None:
-        self._ops.step(action)
-
-    def tick(self) -> None:
-        self._ops.tick()
-
-
-class RobotJointRuntime:
-    def get_pos(self) -> float: ...
-    def get_vel(self) -> float: ...
-    def change_pos(self, pos: float) -> None: ...
-    def change_vel(self, vel: float) -> None: ...
-
-    def change_target_pos(self, pos: float) -> None: ...
-    # NOTE: below two are future use,
-    # since our team concluded that we are focuing on `pos` control
-    def _change_target_vel(self, vel: float) -> None: ...
-    def _change_target_force(self, force: float) -> None: ...
-
-
-class RobotLinkRuntime:
-    def get_pos(self) -> tuple[float, float, float]: ...
-    def get_quat(self) -> tuple[float, float, float, float]: ...
+    def set_control(self, action: list[float]) -> None:
+        self._ops.set_control(action)
 
 
 class ICameraRuntimeOps(Protocol):
