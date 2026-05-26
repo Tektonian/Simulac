@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from simulac.base.envvar.envvar import IEnvvarService
@@ -16,6 +18,8 @@ from simulac.sdk.environment_service.common.environment_service import (
     EnvironmentManagementService,
     IEnvironmentManagementService,
 )
+from simulac.sdk.file_service.common.file_service import FileService
+from simulac.sdk.file_service.common.files import IFileService
 from simulac.sdk.log_service.common.log_service import ILogService, LogService
 from simulac.sdk.runner_service.common.physics_engine_adapter import (
     IPhysicsEngineAdapter,
@@ -51,6 +55,7 @@ register_singleton(IWorldManagementService, WorldManagementService)
 register_singleton(IEnvironmentManagementService, EnvironmentManagementService)
 register_singleton(IEnvironmentBuildService, EnvironmentBuildService)
 
+register_singleton(IFileService, FileService)
 # end-region
 
 # region register services
