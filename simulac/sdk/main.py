@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from simulac.base.envvar.envvar import IEnvvarService
@@ -8,6 +10,7 @@ from simulac.base.instantiate.extensions import (
 )
 from simulac.base.instantiate.instantiate_service import InstantiateService
 from simulac.base.instantiate.service_collection import ServiceCollection
+from simulac.sdk.asset_service.common.asset_service import AssetService, IAssetService
 from simulac.sdk.environment_service.common.environment_build_service import (
     EnvironmentBuildService,
     IEnvironmentBuildService,
@@ -50,6 +53,8 @@ register_singleton(IRunnerManagementService, RunnerManagementService)
 register_singleton(IWorldManagementService, WorldManagementService)
 register_singleton(IEnvironmentManagementService, EnvironmentManagementService)
 register_singleton(IEnvironmentBuildService, EnvironmentBuildService)
+
+register_singleton(IAssetService, AssetService)
 
 # end-region
 
