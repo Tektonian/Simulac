@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.sdk.asset_service.common.asset_service import IAssetService
 from simulac.sdk.environment_service.common.environment_build_service import (
     IEnvironmentBuildService,
 )
@@ -46,11 +47,13 @@ class WorldMakerFacade:
         RunnerManagementService: IRunnerManagementService,
         EnvironmentManagementService: IEnvironmentManagementService,
         EnvironmentBuildService: IEnvironmentBuildService,
+        AssetService: IAssetService,
     ):
         self.LogService = LogService
         self.RunnerManagementService = RunnerManagementService
         self.EnvironmentManagementService = EnvironmentManagementService
         self.EnvironmentBuildService = EnvironmentBuildService
+        self.AssetService = AssetService
 
     def create_environment(
         self,
@@ -157,9 +160,13 @@ class WorldMakerFacade:
         )
 
     def create_runner(self, env_id: str) -> IRunner:
+        env_ret = self.EnvironmentManagementService.get_environment(env_id)
+        if env_ret[0] is None:
+            raise env_ret[1]
+
+        self.AssetService.resolve_environment_assets(env_ret[0])
 
         runner_ret = self.RunnerManagementService.create_runner(env_id)
-
         if runner_ret[0] is None:
             raise runner_ret[1]
 
