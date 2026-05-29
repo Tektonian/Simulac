@@ -58,10 +58,6 @@ class IEnvironment(ABC):
     def snapshop(self):
         pass
 
-    @abstractmethod
-    def load_env(self):
-        pass
-
     def __post_init__(self):
         url = (
             urlsplit(self.env_json_uri)
