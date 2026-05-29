@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk.asset_service.common.asset_service import IAssetService
@@ -60,11 +61,13 @@ class WorldMakerFacade:
         default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
         env_uri_or_prebuilt_id: str | None = None,
     ) -> IEnvironment:
-        # TODO: @gangjeuk
-        # handle pre built env `env_uri_or_prebuilt_id`
-        # [ ] - Download `Environment` definition data
-        # [ ] - build `Environment` from downloaded environment definition json
-        # [ ] - download assets in local
+        if env_uri_or_prebuilt_id is not None:
+            source = Path(env_uri_or_prebuilt_id)
+            if not source.exists():
+                raise SimulacBaseError(
+                    f"Unsupported environment source: {env_uri_or_prebuilt_id}"
+                )
+            return self.EnvironmentManagementService.load_env(source)
 
         env_ret = self.EnvironmentManagementService.create_environment(default_engine)
 
@@ -172,6 +175,63 @@ class WorldMakerFacade:
 
         return runner_ret[0]
 
-    def change_entity_pos(self, entity_id: str, pos: Position) -> None: ...
+    def dump_env(
+        self,
+        env_id: str,
+        *,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> dict[str, Any]:
+        return self.EnvironmentManagementService.dump_env(
+            env_id,
+            include_resolved_assets=include_resolved_assets,
+            include_runtime_state=include_runtime_state,
+            validation=validation,
+        )
 
-    def change_entity_quat(self, entity_id: str, quat: Quaternion) -> None: ...
+    def dump_env_json(
+        self,
+        env_id: str,
+        *,
+        indent: int = 2,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> str:
+        return self.EnvironmentManagementService.dump_env_json(
+            env_id,
+            indent=indent,
+            include_resolved_assets=include_resolved_assets,
+            include_runtime_state=include_runtime_state,
+            validation=validation,
+        )
+
+    def save_env(
+        self,
+        env_id: str,
+        path: str | Path,
+        *,
+        overwrite: bool = False,
+        indent: int = 2,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> Path:
+        output_path = Path(path)
+        if output_path.exists() and not overwrite:
+            raise SimulacBaseError(f"Environment dump already exists: {output_path}")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            self.dump_env_json(
+                env_id,
+                indent=indent,
+                include_resolved_assets=include_resolved_assets,
+                include_runtime_state=include_runtime_state,
+                validation=validation,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return output_path
