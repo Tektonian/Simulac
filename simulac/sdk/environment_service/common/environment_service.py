@@ -9,6 +9,12 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.instantiate.instantiate import ServiceIdentifier, service_identifier
 from simulac.base.result.result import ResultType
 from simulac.sdk.environment_service.common.model.constraint import SceneConstraint
+from simulac.sdk.environment_service.common.model.entity import (
+    EnvironmentCameraEntity,
+    EnvironmentLightEntity,
+    EnvironmentMachineEntity,
+    EnvironmentStuffEntity,
+)
 from simulac.sdk.log_service.common.log_service import ILogService
 from simulac.sdk.world_service.common.world_service import IWorldManagementService
 
@@ -40,8 +46,29 @@ class IEnvironmentManagementService(ServiceIdentifier["IEnvironmentManagementSer
     def add_entity(
         self,
         env_id: str,
-        entity: MJCFPhysicsComponent | URDFPhysicsComponent | USDPhysicsComponent,
+        entity: EnvironmentStuffEntity
+        | EnvironmentMachineEntity
+        | EnvironmentCameraEntity
+        | EnvironmentLightEntity,
+        entity_id: str | None = None,
+        pos: Any = (0, 0, 0),
+        rot: Any = (0, 0, 0),
+        *,
+        fixed: bool | None = None,
     ): ...
+
+    @abstractmethod
+    def load_env(self, path: Path) -> IEnvironment: ...
+
+    @abstractmethod
+    def dump_env(
+        self,
+        env_id: str,
+        *,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> dict[str, Any]: ...
 
 
 class EnvironmentManagementService(IEnvironmentManagementService):
