@@ -715,9 +715,13 @@ class MujocoRefResolver:
     def __require_concrete_vec3(
         self, value: Randomizable[tuple[float, float, float]]
     ) -> tuple[float, float, float]:
-        if not isinstance(value, tuple):
-            raise SimulacBaseError("RandomizableVec3 must be sampled before resolve")
-        return value
+        if isinstance(value, tuple) and len(value) == 3:
+            return (float(value[0]), float(value[1]), float(value[2]))
+
+        if isinstance(value, list) and len(value) == 3:
+            return (float(value[0]), float(value[1]), float(value[2]))
+
+        raise SimulacBaseError("RandomizableVec3 must be sampled before resolve")
 
     def __mat_to_quat_xyzw(
         self, xmat: tuple[float, float, float, float, float, float, float, float, float]
