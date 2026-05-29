@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
@@ -302,17 +303,41 @@ class Environment:
     def constraint(self, *constraints: SceneConstraint) -> None:
         self._env.constraints.extend(constraints)
 
-    def dump_env(self) -> dict:
-        """Return definition of environment.
-        Return type `dict` is json format
+    def dump_env_json(
+        self,
+        *,
+        indent: int = 2,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> str:
+        return self._world_maker.dump_env_json(
+            self._env.id,
+            indent=indent,
+            include_resolved_assets=include_resolved_assets,
+            include_runtime_state=include_runtime_state,
+            validation=validation,
+        )
 
-        Raises:
-            SimulacBaseError: _description_
-
-        Returns:
-            dict: json format environment definition
-        """
-        ...
+    def save_env(
+        self,
+        path: str | Path,
+        *,
+        overwrite: bool = False,
+        indent: int = 2,
+        include_resolved_assets: bool = False,
+        include_runtime_state: bool = False,
+        validation: Literal["none", "warn", "raise"] = "warn",
+    ) -> Path:
+        return self._world_maker.save_env(
+            self._env.id,
+            path,
+            overwrite=overwrite,
+            indent=indent,
+            include_resolved_assets=include_resolved_assets,
+            include_runtime_state=include_runtime_state,
+            validation=validation,
+        )
 
 
 class StuffObject:
