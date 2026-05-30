@@ -252,17 +252,18 @@ class Runner:
         seed: int | None = 0,
         tick: int | None = 5,  # 5ms
         record_location: str
-        | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
         /,
         *,
         runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
     ):
         self.seed = seed
-        self.tick_time = tick
+        self.tick_dt_ms = tick_dt_ms
 
         self._world_maker = obtain_runtime().world_maker
 
-        self._runner = self._world_maker.create_runner(env._env.id)
+        self._runner = self._world_maker.create_runner(
+            env._env.id, tick_dt_ms=tick_dt_ms, runtime_engine=runtime_engine
+        )
 
         # Freeze and prevent changes in env
         env._freeze()

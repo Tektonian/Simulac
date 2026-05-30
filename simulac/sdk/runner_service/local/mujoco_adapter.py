@@ -1229,6 +1229,8 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         LogService: ILogService,
         RunnerManagementService: IRunnerManagementService,
         EnvironmentManagementService: IEnvironmentManagementService,
+        *,
+        tick_dt_ms: int | None = 5,
     ) -> None:
 
         self.env_id = env_id
@@ -1241,6 +1243,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         self._step_count_map: MutableMapping[str, int] = dict()
 
         self.root_spec = mujoco.MjSpec.from_string(MUJOCO_SCENE)
+        self.root_spec.option.timestep = (tick_dt_ms or 5) / 1000.0
         self.root_frame = self.root_spec.worldbody.add_frame()
 
         self.model: mujoco.MjModel | None = None

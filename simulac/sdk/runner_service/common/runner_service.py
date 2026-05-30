@@ -50,7 +50,9 @@ class IRunnerManagementService(ServiceIdentifier["IRunnerManagementService"]):
     def remove_runner(self, runner_id: str) -> None: ...
 
     @abstractmethod
-    def create_runner(self, env_id: str) -> ResultType[IRunner, BaseException]:
+    def create_runner(
+        self, env_id: str, tick_dt_ms: int, runtime_engine: str
+    ) -> ResultType[IRunner, BaseException]:
         pass
 
     @abstractmethod
@@ -101,7 +103,7 @@ class RunnerManagementService(IRunnerManagementService):
             if run.id == runner_id:
                 self.runners.remove(run)
 
-    def create_runner(self, env_id: str):
+    def create_runner(self, env_id: str, tick_dt_ms: int, runtime_engine: str):
         # check adapter exist
         adapter = self.physics_adapter.get(env_id)
         if adapter is not None:
@@ -131,7 +133,9 @@ class RunnerManagementService(IRunnerManagementService):
             if factory is None:
                 return (None, SimulacBaseError(f"No proper adaptor for mujoco"))
 
-            adapter = factory.create_physics_engine_adapter(env.id)
+            adapter = factory.create_physics_engine_adapter(
+                env.id, tick_dt_ms=tick_dt_ms
+            )
             self.physics_adapter[env.id] = adapter
             runner = adapter.create_runner()
             runner.initialize()
