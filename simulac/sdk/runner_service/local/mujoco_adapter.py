@@ -73,9 +73,12 @@ from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoActuatorBinding,
     MujocoCameraBinding,
+    MujocoGeomBinding,
     MujocoJointBinding,
     MujocoLinkBinding,
     MujocoRobotBinding,
+    MujocoSensorBinding,
+    MujocoSiteBinding,
     MujocoStuffBinding,
 )
 from simulac.sdk.runner_service.local.mujoco.runtime import (
@@ -1682,6 +1685,16 @@ class MujocoAdapter(IPhysicsEngineAdapter):
                     if joint_binding.joint_id == target_id:
                         joint_binding.actuator_ids.append(actuator_id)
                         break
+        site_ids, sites = self.__build_site_bindings(entity_id, body_ids)
+        geoms = self.__build_geom_bindings(entity_id, body_ids, geom_ids)
+        sensors = self.__build_sensor_bindings(
+            entity_id,
+            body_ids=body_ids,
+            geom_ids=geom_ids,
+            site_ids=site_ids,
+            joint_ids=joint_ids,
+            actuator_ids=actuator_ids,
+        )
         return MujocoRobotBinding(
             entity_id=entity_id,
             name=entity_id,
@@ -1693,9 +1706,13 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             geom_ids=geom_ids,
             joint_ids=joint_ids,
             actuator_ids=actuator_ids,
-            links=links,
+            site_ids=site_ids,
             joints=joints,
             actuators=actuators,
+            links=links,
+            geoms=geoms,
+            sites=sites,
+            sensors=sensors,
             root_freejoint_id=root_freejoint_id,
             mocap_id=int(model.body_mocapid[root_body_id]),
         )
@@ -1742,14 +1759,27 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             ):
                 root_freejoint_id = jid
                 break
-
+        site_ids, sites = self.__build_site_bindings(entity_id, body_ids)
+        geoms = self.__build_geom_bindings(entity_id, body_ids, geom_ids)
+        sensors = self.__build_sensor_bindings(
+            entity_id,
+            body_ids=body_ids,
+            geom_ids=geom_ids,
+            site_ids=site_ids,
+            joint_ids=joint_ids,
+            actuator_ids=actuator_ids,
+        )
         return MujocoStuffBinding(
             entity_id=entity_id,
             root_body_id=root_body_id,
             body_ids=body_ids,
             geom_ids=geom_ids,
             joint_ids=joint_ids,
+            site_ids=site_ids,
             actuator_ids=actuator_ids,
+            geoms=geoms,
+            sites=sites,
+            sensors=sensors,
             root_freejoint_id=root_freejoint_id,
             mocap_id=int(self.model.body_mocapid[root_body_id]),
         )
@@ -1787,3 +1817,118 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             camera_full_name=camera_full_name,
             mocap_id=int(self.model.body_mocapid[root_body_id]),
         )
+
+    def __local_name(self, entity_id: str, full_name: str) -> str:
+        return (
+            full_name.split("/", 1)[1]
+            if full_name.startswith(f"{entity_id}/")
+            else full_name
+        )
+
+    def __build_geom_bindings(
+        self,
+        entity_id: str,
+        body_ids: list[int],
+        geom_ids: list[int],
+    ) -> dict[str, MujocoGeomBinding]:
+        model = self.model
+        if model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        geoms: dict[str, MujocoGeomBinding] = {}
+        for geom_id in geom_ids:
+            full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+                or f"geom_{geom_id}"
+            )
+            name = self.__local_name(entity_id, full_name)
+            geoms[name] = MujocoGeomBinding(
+                entity_id=entity_id,
+                full_name=full_name,
+                name=name,
+                geom_id=geom_id,
+                body_id=int(model.geom_bodyid[geom_id]),
+            )
+        return geoms
+
+    def __build_site_bindings(
+        self,
+        entity_id: str,
+        body_ids: list[int],
+    ) -> tuple[list[int], dict[str, MujocoSiteBinding]]:
+        model = self.model
+        if model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        site_ids = [
+            sid for sid in range(model.nsite) if int(model.site_bodyid[sid]) in body_ids
+        ]
+        sites: dict[str, MujocoSiteBinding] = {}
+        for site_id in site_ids:
+            full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SITE, site_id)
+                or f"site_{site_id}"
+            )
+            name = self.__local_name(entity_id, full_name)
+            sites[name] = MujocoSiteBinding(
+                entity_id=entity_id,
+                full_name=full_name,
+                name=name,
+                site_id=site_id,
+                body_id=int(model.site_bodyid[site_id]),
+            )
+        return site_ids, sites
+
+    def __build_sensor_bindings(
+        self,
+        entity_id: str,
+        *,
+        body_ids: list[int],
+        geom_ids: list[int],
+        site_ids: list[int],
+        joint_ids: list[int],
+        actuator_ids: list[int],
+    ) -> dict[str, MujocoSensorBinding]:
+        model = self.model
+        if model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        sensors: dict[str, MujocoSensorBinding] = {}
+        for sensor_id in range(model.nsensor):
+            full_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, sensor_id)
+                or f"sensor_{sensor_id}"
+            )
+
+            obj_type = int(model.sensor_objtype[sensor_id])
+            obj_id = int(model.sensor_objid[sensor_id])
+
+            belongs_by_name = full_name.startswith(f"{entity_id}/")
+            belongs_by_target = (
+                (obj_type == int(mujoco.mjtObj.mjOBJ_BODY) and obj_id in body_ids)
+                or (obj_type == int(mujoco.mjtObj.mjOBJ_GEOM) and obj_id in geom_ids)
+                or (obj_type == int(mujoco.mjtObj.mjOBJ_SITE) and obj_id in site_ids)
+                or (obj_type == int(mujoco.mjtObj.mjOBJ_JOINT) and obj_id in joint_ids)
+                or (
+                    obj_type == int(mujoco.mjtObj.mjOBJ_ACTUATOR)
+                    and obj_id in actuator_ids
+                )
+            )
+
+            if not belongs_by_name and not belongs_by_target:
+                continue
+
+            name = self.__local_name(entity_id, full_name)
+            sensors[name] = MujocoSensorBinding(
+                entity_id=entity_id,
+                full_name=full_name,
+                name=name,
+                sensor_id=sensor_id,
+                sensor_type=int(model.sensor_type[sensor_id]),
+                obj_type=obj_type,
+                obj_id=obj_id,
+                adr=int(model.sensor_adr[sensor_id]),
+                dim=int(model.sensor_dim[sensor_id]),
+            )
+
+        return sensors
