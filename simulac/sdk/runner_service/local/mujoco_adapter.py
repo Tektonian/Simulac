@@ -679,6 +679,11 @@ class MujocoRunner(IRunner):
 
         mujoco.mj_forward(self.mj_model, data)
 
+        for op in self.env.relations:
+            self._apply_build_op(op, self.resolver, sampler)
+
+        mujoco.mj_forward(self.mj_model, data)
+
         for eid, values in candidate.items():
             if eid not in self._stuff_bindings:
                 continue
@@ -1037,7 +1042,6 @@ class MujocoRunner(IRunner):
 
     def _apply_build_op(
         self,
-        eid: str,
         op: BuildOpBase,
         resolver: MujocoRefResolver,
         sampler: ResetSampler,
