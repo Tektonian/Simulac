@@ -81,6 +81,7 @@ from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoSiteBinding,
     MujocoStuffBinding,
 )
+from simulac.sdk.runner_service.local.mujoco.context import MujocoNativeContext
 from simulac.sdk.runner_service.local.mujoco.runtime import (
     MujocoCameraRuntimeOps,
     MujocoRobotRuntimeOps,
@@ -529,6 +530,23 @@ class MujocoRunner(IRunner):
 
     def _debug_render(self):
         return mujoco.viewer.launch_passive(self.mj_model, self._data)
+
+    def context(self, engine: Literal["mujoco"] | None) -> MujocoNativeContext:
+        """Get native mujoco context for direct access to MjData and MjModel
+
+        Args:
+            engine (Literal[&quot;mujoco&quot;] | None): Engine type. Just ignore it. It's just for typing
+
+        Returns:
+            MujocoNativeContext: _description_
+        """
+        return MujocoNativeContext(
+            model=self.mj_model,
+            data=self._require_data(),
+            stuff_bindings=self._stuff_bindings,
+            machine_bindings=self._machine_bindings,
+            camera_bindings=self._camera_bindings,
+        )
 
     def _sampling_candidate(self, sampler: ResetSampler) -> dict[str, dict[str, Any]]:
         candidate: _ResetCandidate = {}

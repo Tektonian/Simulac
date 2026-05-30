@@ -22,6 +22,7 @@ from .object import (
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.runner_service.common.model.context import INativeContext
     from simulac.sdk.runner_service.common.model.runtime import (
         BallJointState,
         FreeJointState,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
         StuffRuntime as SDKStuffRuntime,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
+    from simulac.sdk.runner_service.local.mujoco.context import MujocoNativeContext
 
 
 class StuffRuntime:
@@ -314,6 +316,23 @@ class Runner:
         raise SimulacBaseError(f"Unsupported runtime object: {type(obj).__name__}")
 
     def close(self) -> None: ...
+
+    @overload
+    def context(self, engine: None) -> INativeContext: ...
+    @overload
+    def context(self, engine: Literal["mujoco"]) -> MujocoNativeContext: ...
+    def context(
+        self, engine: None | Literal["mujoco"]
+    ) -> INativeContext | MujocoNativeContext:
+        """Return physics engine native context
+
+        Args:
+            engine (None | Literal[&quot;mujoco&quot;]): Engine name. Ignore it, it's just for typing.
+
+        Returns:
+            INativeContext | MujocoNativeContext: _description_
+        """
+        return self._runner.context(engine or "")
 
     # For context manage
     # e.g., `with Runner(env) as runner:`

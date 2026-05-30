@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, overload
 
 if TYPE_CHECKING:
+    from .model.context import INativeContext
     from .model.runtime import RobotRuntime, RuntimeState, StuffRuntime
 
 
@@ -55,6 +56,9 @@ class IRunner(ABC):
     @abstractmethod
     def _debug_render(self) -> Any:
         """Run adapter specific rendering engine. Should be used for debugging"""
+
+    @abstractmethod
+    def context(self, engine: str) -> "INativeContext": ...
 
 
 class IRunnerFactory(ABC):
