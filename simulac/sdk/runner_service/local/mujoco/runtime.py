@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+from array import array
+from math import sqrt
 from typing import TYPE_CHECKING, Callable
 
 import mujoco
 
 from simulac.base.error.error import SimulacBaseError
+from simulac.base.types.geometry import Vec3
+from simulac.sdk.environment_service.common.model.ref import ColliderRef
 from simulac.sdk.runner_service.common.model.runtime import (
     ICameraRuntimeOps,
     ILightRuntimeOps,
     IRobotRuntimeOps,
     IStuffRuntimeOps,
 )
-
-if TYPE_CHECKING:
-    import mujoco
-
-    from .binding import MujocoCameraBinding, MujocoRobotBinding, MujocoStuffBinding
 
 
 def _wxyz_to_xyzw(quat: tuple[float, float, float, float]) -> list[float]:
@@ -24,6 +23,118 @@ def _wxyz_to_xyzw(quat: tuple[float, float, float, float]) -> list[float]:
 
 def _xyzw_to_wxyz(quat: tuple[float, float, float, float]) -> list[float]:
     return [float(quat[3]), float(quat[0]), float(quat[1]), float(quat[2])]
+
+
+class MujocoRuntimeStateOps:
+    def __init__(
+        self,
+        model: mujoco.MjModel,
+        data: mujoco.MjData,
+        *,
+        step_count: Callable[[], int],
+        stuff_bindings: dict[str, MujocoStuffBinding],
+        machine_bindings: dict[str, MujocoRobotBinding],
+    ) -> None:
+        self._model = model
+        self._data = data
+        self._step_count = step_count
+        self._stuff_bindings = stuff_bindings
+        self._machine_bindings = machine_bindings
+
+    def get_time(self) -> float:
+        return float(self._data.time)
+
+    def get_step_count(self) -> int:
+        return int(self._step_count())
+
+    def contact_indices(self, a: object, b: object) -> tuple[int, ...]:
+        a_geom_ids = self._resolve_geom_ids(a)
+        b_geom_ids = self._resolve_geom_ids(b)
+
+        indices: list[int] = []
+        for contact_idx in range(int(self._data.ncon)):
+            contact = self._data.contact[contact_idx]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+
+            if (geom1 in a_geom_ids and geom2 in b_geom_ids) or (
+                geom2 in a_geom_ids and geom1 in b_geom_ids
+            ):
+                indices.append(contact_idx)
+
+        return tuple(indices)
+
+    def contact_point(self, contact_index: int) -> Vec3:
+        self._validate_contact_index(contact_index)
+        point = self._data.contact[contact_index].pos
+        return (float(point[0]), float(point[1]), float(point[2]))
+
+    def contact_normal(self, contact_index: int) -> Vec3:
+        self._validate_contact_index(contact_index)
+        frame = self._data.contact[contact_index].frame
+        return (float(frame[0]), float(frame[1]), float(frame[2]))
+
+    def contact_force(self, contact_index: int) -> float | None:
+        self._validate_contact_index(contact_index)
+        contact_force = array("d", [0.0] * 6)
+        try:
+            mujoco.mj_contactForce(
+                self._model,
+                self._data,
+                contact_index,
+                contact_force,
+            )
+        except TypeError:
+            return None
+
+        return sqrt(
+            float(contact_force[0]) ** 2
+            + float(contact_force[1]) ** 2
+            + float(contact_force[2]) ** 2
+        )
+
+    def _validate_contact_index(self, contact_index: int) -> None:
+        if contact_index < 0 or contact_index >= int(self._data.ncon):
+            raise SimulacBaseError(
+                f"Contact index {contact_index} is out of range: ncon={self._data.ncon}"
+            )
+
+    def _resolve_geom_ids(self, target: object) -> set[int]:
+        if isinstance(target, ColliderRef):
+            return {self._named_geom_id(target.entity_id, target.name)}
+
+        entity_id = self._entity_id_from_runtime(target)
+        if entity_id is None:
+            raise SimulacBaseError(f"Unsupported contact target: {target!r}")
+
+        binding = self._stuff_bindings.get(entity_id)
+        if binding is not None:
+            return set(binding.geom_ids)
+
+        machine_binding = self._machine_bindings.get(entity_id)
+        if machine_binding is not None:
+            return set(machine_binding.geom_ids)
+
+        raise SimulacBaseError(f"No contact-capable entity named {entity_id!r}")
+
+    def _named_geom_id(self, entity_id: str, name: str) -> int:
+        full_name = f"{entity_id}/{name}"
+        geom_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_GEOM, full_name)
+        if geom_id < 0:
+            raise SimulacBaseError(f"No MuJoCo geom named {full_name!r}")
+        return int(geom_id)
+
+    def _entity_id_from_runtime(self, target: object) -> str | None:
+        entity_id = getattr(target, "id", None)
+        if isinstance(entity_id, str):
+            return entity_id
+
+        runtime = getattr(target, "_runtime", None)
+        runtime_id = getattr(runtime, "id", None)
+        if isinstance(runtime_id, str):
+            return runtime_id
+
+        return None
 
 
 class MujocoStuffRuntimeOps(IStuffRuntimeOps):
@@ -593,3 +704,16 @@ class MujocoCameraRuntimeOps(ICameraRuntimeOps):
         self._model.cam_fovy[self._binding.camera_id] = float(fov)
         mujoco.mj_forward(self._model, self._data)
 
+
+class MujocoLightRuntimeOps(ICameraRuntimeOps):
+    def get_pos(self) -> tuple[float, float, float]: ...
+    def get_quat(self) -> tuple[float, float, float, float]: ...
+
+    def change_pos(self, pos: tuple[float, float, float]) -> None: ...
+    def change_quat(self, quat: tuple[float, float, float, float]) -> None: ...
+
+    def get_color(self) -> tuple[float, float, float]: ...
+    def change_color(self, color: tuple[float, float, float]) -> None: ...
+
+    def get_intensity(self) -> float: ...
+    def change_intensity(self, intensity: float) -> None: ...
