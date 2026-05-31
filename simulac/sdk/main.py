@@ -91,12 +91,15 @@ environment_build_service: IEnvironmentBuildService = (
 class MujocoAdapterFactory(IPhysicsEngineAdapterFactory):
     def __init__(self) -> None: ...
     @staticmethod
-    def create_physics_engine_adapter(env_id: str) -> IPhysicsEngineAdapter:
+    def create_physics_engine_adapter(
+        env_id: str, *, tick_dt_ms: int | None = 5
+    ) -> IPhysicsEngineAdapter:
         return MujocoAdapter(
             env_id,
             log_service,
             runner_management_service,
             environment_management_service,
+            tick_dt_ms=tick_dt_ms,
         )
 
 

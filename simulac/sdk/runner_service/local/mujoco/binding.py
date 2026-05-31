@@ -10,8 +10,12 @@ class MujocoStuffBinding:
     root_body_id: int
     body_ids: list[int] = field(default_factory=list[int])
     geom_ids: list[int] = field(default_factory=list[int])
+    site_ids: list[int] = field(default_factory=list[int])
     joint_ids: list[int] = field(default_factory=list[int])
     actuator_ids: list[int] = field(default_factory=list[int])
+    geoms: dict[str, "MujocoGeomBinding"] = field(default_factory=dict)
+    sites: dict[str, "MujocoSiteBinding"] = field(default_factory=dict)
+    sensors: dict[str, "MujocoSensorBinding"] = field(default_factory=dict)
     root_freejoint_id: int = -1
     mocap_id: int = -1
 
@@ -28,12 +32,16 @@ class MujocoRobotBinding:
 
     body_ids: list[int] = field(default_factory=list)
     geom_ids: list[int] = field(default_factory=list)
+    site_ids: list[int] = field(default_factory=list)
     joint_ids: list[int] = field(default_factory=list)
     actuator_ids: list[int] = field(default_factory=list)
 
     links: dict[str, "MujocoLinkBinding"] = field(default_factory=dict)
+    geoms: dict[str, "MujocoGeomBinding"] = field(default_factory=dict)
+    sites: dict[str, "MujocoSiteBinding"] = field(default_factory=dict)
     joints: dict[str, "MujocoJointBinding"] = field(default_factory=dict)
     actuators: dict[str, "MujocoActuatorBinding"] = field(default_factory=dict)
+    sensors: dict[str, "MujocoSensorBinding"] = field(default_factory=dict)
 
     root_freejoint_id: int = -1
     mocap_id: int = -1
@@ -92,6 +100,37 @@ class MujocoActuatorBinding:
     act_range: tuple[float, float] | None = None
 
     group: int = 0
+
+
+@dataclass(slots=True)
+class MujocoGeomBinding:
+    entity_id: str
+    full_name: str
+    name: str
+    geom_id: int
+    body_id: int
+
+
+@dataclass(slots=True)
+class MujocoSiteBinding:
+    entity_id: str
+    full_name: str
+    name: str
+    site_id: int
+    body_id: int
+
+
+@dataclass(slots=True)
+class MujocoSensorBinding:
+    entity_id: str
+    full_name: str
+    name: str
+    sensor_id: int
+    sensor_type: int
+    obj_type: int
+    obj_id: int
+    adr: int
+    dim: int
 
 @dataclass(slots=True)
 class MujocoCameraBinding:

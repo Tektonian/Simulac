@@ -22,6 +22,7 @@ from .object import (
 )
 
 if TYPE_CHECKING:
+    from simulac.sdk.runner_service.common.model.context import INativeContext
     from simulac.sdk.runner_service.common.model.runtime import (
         BallJointState,
         FreeJointState,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
         StuffRuntime as SDKStuffRuntime,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
+    from simulac.sdk.runner_service.local.mujoco.context import MujocoNativeContext
 
 
 class StuffRuntime:
@@ -248,19 +250,21 @@ class Runner:
         self,
         env: Environment,
         seed: int | None = 0,
-        tick: int | None = 5,  # 5ms
-        record_location: str
-        | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
+        tick_dt_ms: int | None = 5,  # 5ms
+        # record_location: str
+        # | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
         /,
         *,
         runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
     ):
         self.seed = seed
-        self.tick_time = tick
+        self.tick_dt_ms = tick_dt_ms
 
         self._world_maker = obtain_runtime().world_maker
 
-        self._runner = self._world_maker.create_runner(env._env.id)
+        self._runner = self._world_maker.create_runner(
+            env._env.id, tick_dt_ms=tick_dt_ms, runtime_engine=runtime_engine
+        )
 
         # Freeze and prevent changes in env
         env._freeze()
@@ -314,6 +318,23 @@ class Runner:
         raise SimulacBaseError(f"Unsupported runtime object: {type(obj).__name__}")
 
     def close(self) -> None: ...
+
+    @overload
+    def context(self, engine: None) -> INativeContext: ...
+    @overload
+    def context(self, engine: Literal["mujoco"]) -> MujocoNativeContext: ...
+    def context(
+        self, engine: None | Literal["mujoco"]
+    ) -> INativeContext | MujocoNativeContext:
+        """Return physics engine native context
+
+        Args:
+            engine (None | Literal[&quot;mujoco&quot;]): Engine name. Ignore it, it's just for typing.
+
+        Returns:
+            INativeContext | MujocoNativeContext: _description_
+        """
+        return self._runner.context(engine or "")
 
     # For context manage
     # e.g., `with Runner(env) as runner:`

@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 class IPhysicsEngineAdapterFactory(ABC):
     @staticmethod
     @abstractmethod
-    def create_physics_engine_adapter(env_id: str) -> IPhysicsEngineAdapter: ...
+    def create_physics_engine_adapter(
+        env_id: str, *, tick_dt_ms: int | None = 5
+    ) -> IPhysicsEngineAdapter: ...
 
 
 @dataclass(frozen=True)

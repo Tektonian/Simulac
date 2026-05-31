@@ -162,14 +162,18 @@ class WorldMakerFacade:
             env.id, entity, entity_id, pos, rot, fixed=fixed
         )
 
-    def create_runner(self, env_id: str) -> IRunner:
+    def create_runner(
+        self, env_id: str, tick_dt_ms: int, runtime_engine: str
+    ) -> IRunner:
         env_ret = self.EnvironmentManagementService.get_environment(env_id)
         if env_ret[0] is None:
             raise env_ret[1]
 
         self.AssetService.resolve_environment_assets(env_ret[0])
 
-        runner_ret = self.RunnerManagementService.create_runner(env_id)
+        runner_ret = self.RunnerManagementService.create_runner(
+            env_id, tick_dt_ms, runtime_engine
+        )
         if runner_ret[0] is None:
             raise runner_ret[1]
 
