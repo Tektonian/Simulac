@@ -250,8 +250,9 @@ class Runner:
         self,
         env: Environment,
         seed: int | None = 0,
-        tick: int | None = 5,  # 5ms
-        record_location: str
+        tick_dt_ms: int | None = 5,  # 5ms
+        # record_location: str
+        # | None = None,  # save location of runtime recording data (a.k.a. Lerobot dataset format)
         /,
         *,
         runtime_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
