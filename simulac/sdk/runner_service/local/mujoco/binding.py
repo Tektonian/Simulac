@@ -18,6 +18,7 @@ class MujocoStuffBinding:
     sensors: dict[str, "MujocoSensorBinding"] = field(default_factory=dict)
     root_freejoint_id: int = -1
     mocap_id: int = -1
+    joints: dict[str, "MujocoJointBinding"] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

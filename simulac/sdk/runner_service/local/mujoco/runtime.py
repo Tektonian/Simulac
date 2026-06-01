@@ -251,6 +251,113 @@ class MujocoStuffRuntimeOps(IStuffRuntimeOps):
         for geom_id in binding.geom_ids:
             model.geom_friction[geom_id][0] = float(friction)
 
+    def get_joint_type(self, name: str):
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+            return "hinge"
+        if joint_type == mujoco.mjtJoint.mjJNT_SLIDE:
+            return "slide"
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            return "ball"
+        if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            return "free"
+        raise SimulacBaseError(f"Unsupported MuJoCo joint type: {joint_type}")
+
+    def get_joint_scalar_pos(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qpos[joint.qpos_addr])
+
+    def get_joint_scalar_vel(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qvel[joint.qvel_addr])
+
+    def get_joint_free_pos(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type != mujoco.mjtJoint.mjJNT_FREE:
+            raise SimulacBaseError(f"Joint {name!r} is not a free joint")
+        pos = self._data.qpos[joint.qpos_addr : joint.qpos_addr + 3]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_joint_quat(self, name: str) -> tuple[float, float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            quat_wxyz = self._data.qpos[joint.qpos_addr : joint.qpos_addr + 4]
+        elif joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            quat_wxyz = self._data.qpos[joint.qpos_addr + 3 : joint.qpos_addr + 7]
+        else:
+            raise SimulacBaseError(f"Joint {name!r} has no quaternion state")
+
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def get_joint_linear_vel(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type != mujoco.mjtJoint.mjJNT_FREE:
+            raise SimulacBaseError(f"Joint {name!r} has no linear velocity vector")
+        vel = self._data.qvel[joint.qvel_addr : joint.qvel_addr + 3]
+        return (float(vel[0]), float(vel[1]), float(vel[2]))
+
+    def get_joint_angular_vel(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        joint_type = int(self._model.jnt_type[joint.joint_id])
+        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+            vel = self._data.qvel[joint.qvel_addr : joint.qvel_addr + 3]
+        elif joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            vel = self._data.qvel[joint.qvel_addr + 3 : joint.qvel_addr + 6]
+        else:
+            raise SimulacBaseError(f"Joint {name!r} has no angular velocity vector")
+        return (float(vel[0]), float(vel[1]), float(vel[2]))
+
+    def get_joint_axis(self, name: str) -> tuple[float, float, float]:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return joint.axis
+
+    def get_joint_limited(self, name: str) -> bool:
+        joint = self.__require_joint(name)
+        return bool(self._model.jnt_limited[joint.joint_id])
+
+    def get_joint_range(self, name: str) -> tuple[float, float] | None:
+        joint = self.__require_joint(name)
+        if not bool(self._model.jnt_limited[joint.joint_id]):
+            return None
+        return (
+            float(self._model.jnt_range[joint.joint_id][0]),
+            float(self._model.jnt_range[joint.joint_id][1]),
+        )
+
+    def get_joint_force(self, name: str) -> float:
+        joint = self.__require_joint(name)
+        self.__require_scalar_joint(name, joint.joint_id)
+        return float(self._data.qfrc_actuator[joint.qvel_addr])
+
+    def __require_joint(self, name: str):
+        joint = self._binding.joints.get(name)
+        if joint is None:
+            known = ", ".join(sorted(self._binding.joints)) or "<none>"
+            raise SimulacBaseError(
+                f"No joint {name!r} on stuff {self.id!r}. Known joints: {known}"
+            )
+        return joint
+
+    def __require_scalar_joint(self, name: str, joint_id: int) -> None:
+        joint_type = int(self._model.jnt_type[joint_id])
+        if joint_type not in (
+            mujoco.mjtJoint.mjJNT_HINGE,
+            mujoco.mjtJoint.mjJNT_SLIDE,
+        ):
+            raise SimulacBaseError(f"Joint {name!r} has no scalar position/velocity")
+
 
 class MujocoRobotRuntimeOps(IRobotRuntimeOps):
     def __init__(

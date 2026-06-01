@@ -6,6 +6,34 @@ if TYPE_CHECKING:
     from simulac.base.types.geometry import Quat, Vec3
 
 
+def _joint_state(ops: IJointRuntimeOps, name: str) -> JointState:
+    """Common joint parts for all physics engine"""
+    joint_type = ops.get_joint_type(name)
+    if joint_type == "hinge":
+        return HingeJointState(ops, name)
+    if joint_type == "slide":
+        return SlideJointState(ops, name)
+    if joint_type == "ball":
+        return BallJointState(ops, name)
+    return FreeJointState(ops, name)
+
+
+class IJointRuntimeOps(Protocol):
+    def get_joint_type(
+        self, name: str
+    ) -> Literal["hinge", "slide", "ball", "free"]: ...
+    def get_joint_scalar_pos(self, name: str) -> float: ...
+    def get_joint_scalar_vel(self, name: str) -> float: ...
+    def get_joint_free_pos(self, name: str) -> Vec3: ...
+    def get_joint_quat(self, name: str) -> Quat: ...
+    def get_joint_linear_vel(self, name: str) -> Vec3: ...
+    def get_joint_angular_vel(self, name: str) -> Vec3: ...
+    def get_joint_axis(self, name: str) -> Vec3: ...
+    def get_joint_limited(self, name: str) -> bool: ...
+    def get_joint_range(self, name: str) -> tuple[float, float] | None: ...
+    def get_joint_force(self, name: str) -> float: ...
+
+
 class LinkState:
     def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
         self._ops = ops
@@ -59,7 +87,7 @@ class SiteState:
 
 
 class _JointStateBase:
-    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+    def __init__(self, ops: IJointRuntimeOps, name: str) -> None:
         self._ops = ops
         self.name = name
 
@@ -250,7 +278,7 @@ class RuntimeState:
 
 
 @runtime_checkable
-class IStuffRuntimeOps(Protocol):
+class IStuffRuntimeOps(IJointRuntimeOps, Protocol):
     def get_pos(self) -> Vec3: ...
     def get_quat(self) -> Quat: ...
     def get_mass(self) -> float: ...
@@ -290,6 +318,9 @@ class StuffRuntime:
 
     def change_friction(self, friction: float) -> None:
         self._ops.change_friction(friction)
+
+    def joint(self, name: str) -> JointState:
+        return _joint_state(self._ops, name)
 
 
 class IRobotRuntimeOps(Protocol):
