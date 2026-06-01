@@ -216,7 +216,7 @@ class EnvironmentManagementService(IEnvironmentManagementService):
         ]
 
     def __hydrate_stuff(self, env: IEnvironment, item: dict[str, Any]) -> None:
-        asset_uri = item.get("asset", {}).get("uri") or item.get("asset_uri")
+        asset_uri = item.get("asset_uri")
         entity = EnvironmentStuffEntity(
             description=item.get("description", ""),
             asset_uri=asset_uri,
@@ -224,7 +224,6 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             size=self.__load_typed_value(item.get("size", (1, 1, 1))),
             mass=self.__load_typed_value(item.get("mass")),
             friction=self.__load_typed_value(item.get("friction")),
-            density=self.__load_typed_value(item.get("density")),
         )
 
         self.add_entity(
@@ -237,7 +236,7 @@ class EnvironmentManagementService(IEnvironmentManagementService):
         )
 
     def __hydrate_machine(self, env: IEnvironment, item: dict[str, Any]) -> None:
-        asset_uri = item.get("asset", {}).get("uri") or item.get("asset_uri")
+        asset_uri = item.get("asset_uri")
         entity = EnvironmentMachineEntity(
             description=item.get("description", ""),
             asset_uri=asset_uri,
@@ -463,7 +462,7 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             # "type": "machine",
             "entity_id": entity.id,
             "description": entity.description,
-            "asset": entity.asset_uri,
+            "asset_uri": entity.asset_uri,
             "pos": self.__jsonable(entity.pos),
             "rot": self.__jsonable(entity.rot),
             "init_position": self.__jsonable(entity.init_position),
@@ -480,10 +479,10 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             return
 
         entity_ids = {
-            entity["id"]
+            entity.get("entity_id")
             for group in ("stuffs", "machines", "cameras", "lights")
             for entity in definition[group]
-            if entity.get("id") is not None
+            if entity.get("entity_id") is not None
         }
 
         errors: list[str] = []

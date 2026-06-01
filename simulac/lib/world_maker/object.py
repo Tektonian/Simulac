@@ -279,7 +279,19 @@ class Environment:
         # TODO: @gangjeuk
         # [ ] - Remove object
         # [ ] - Remove relations and constraints connected to object
-        pass
+        self._assert_mutable()
+
+        entity_id = (
+            object_or_object_id
+            if isinstance(object_or_object_id, str)
+            else object_or_object_id._entity.id
+        )
+        if entity_id is None:
+            raise SimulacBaseError(
+                "There is no such entity. Did you forget to add or write wrong entity_id?"
+            )
+
+        self._world_maker.remove_entity(self._env.id, entity_id)
 
     def get_object(
         self, object_id: str
@@ -493,6 +505,7 @@ class RobotObject(Generic[ActionT]):
         /,
         *,
         _create_sentinal: object,
+        env: Environment,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
             raise SimulacBaseError("Please do not create stuff object directly")
