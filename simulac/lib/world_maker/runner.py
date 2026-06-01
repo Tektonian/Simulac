@@ -97,6 +97,7 @@ class StuffRuntime:
         joint.change_pos(Vec3)
         joint.change_target(value)
         """
+        return self._runtime.joint(name)
 
 
 class RobotRuntime(Generic[ActionT]):
