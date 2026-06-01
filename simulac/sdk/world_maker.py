@@ -28,6 +28,9 @@ if TYPE_CHECKING:
         CameraSpec,
         LightSpec,
     )
+    from simulac.sdk.environment_service.common.model.ref import (
+        PointRefType,
+    )
     from simulac.sdk.environment_service.common.randomize import (
         RandomizableVec3,
     )
@@ -94,7 +97,16 @@ class WorldMakerFacade:
         """
         # TODO: @gangjeuk
         # handle both cases, file://home/gangjeuk/fanda.xml and https://remote/fanda.xml
-        entity = EnvironmentStuffEntity(None, description, asset_uri_or_prebuilt_name)
+        # rendering = self._rendering_asset_resolver.create_rendering_component(
+        #     asset_uri_or_prebuilt_name,
+        # )
+        # physics = self._create_physics_component(asset_uri_or_prebuilt_name)
+        entity = EnvironmentStuffEntity(
+            id=None,
+            description=description,
+            asset_uri=asset_uri_or_prebuilt_name,
+            original_asset_uri=asset_uri_or_prebuilt_name,
+        )
 
         return entity
 
@@ -116,9 +128,30 @@ class WorldMakerFacade:
         """
         # TODO: @gangjeuk
         # handle both cases, file://home/gangjeuk/fanda.xml and https://remote/fanda.xml
-        entity = EnvironmentMachineEntity(None, description, asset_uri_or_prebuilt_name)
+        entity = EnvironmentMachineEntity(
+            id=None,
+            description=description,
+            asset_uri=asset_uri_or_prebuilt_name,
+            original_asset_uri=asset_uri_or_prebuilt_name,
+        )
 
         return entity
+
+    # def _create_physics_component(
+    #     self, physics_uri_or_prebuilt_name: str
+    # ) -> MJCFPhysicsComponent | USDPhysicsComponent | URDFPhysicsComponent:
+    #     asset_format = detect_asset_format(physics_uri_or_prebuilt_name)
+
+    #     if asset_format == "mjcf":
+    #         return MJCFPhysicsComponent(physics_uri_or_prebuilt_name)
+    #     if asset_format == "urdf":
+    #         return URDFPhysicsComponent(physics_uri_or_prebuilt_name)
+    #     if asset_format == "usd":
+    #         return USDPhysicsComponent(physics_uri_or_prebuilt_name)
+
+    #     raise SimulacBaseError(
+    #         f"Unsupported physics asset format for uri: {physics_uri_or_prebuilt_name}"
+    #     )
 
     def create_camera_entity(
         self,
@@ -161,6 +194,13 @@ class WorldMakerFacade:
         return self.EnvironmentBuildService.add_entity(
             env.id, entity, entity_id, pos, rot, fixed=fixed
         )
+
+    def remove_entity(self, env_id: str, entity_id: str) -> None:
+        env_ret = self.EnvironmentManagementService.get_environment(env_id)
+        if env_ret[0] is None:
+            raise env_ret[1]
+
+        self.EnvironmentBuildService.remove_entity(entity_id)
 
     def create_runner(
         self, env_id: str, tick_dt_ms: int, runtime_engine: str

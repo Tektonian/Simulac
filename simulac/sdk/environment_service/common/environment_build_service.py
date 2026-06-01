@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import fields, is_dataclass
 from typing import TYPE_CHECKING, Literal, NoReturn, Tuple, Union
 from urllib.parse import SplitResult
 
@@ -168,6 +169,62 @@ class EnvironmentBuildService(IEnvironmentBuildService):
         self._entities_by_id[new_entity_id] = entity
 
         return new_entity_id
+
+    def __mentions_entity(self, value: object, entity_id: str) -> bool:
+        if isinstance(value, str):
+            return value == entity_id
+
+        ref_entity_id = getattr(value, "entity_id", None)
+        if ref_entity_id == entity_id:
+            return True
+
+        if is_dataclass(value):
+            return any(
+                self.__mentions_entity(getattr(value, field.name), entity_id)
+                for field in fields(value)
+            )
+
+        if isinstance(value, dict):
+            return any(
+                self.__mentions_entity(item, entity_id) for item in value.values()
+            )
+
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return any(self.__mentions_entity(item, entity_id) for item in value)
+
+        return False
+
+    def remove_entity(self, entity_id: str) -> None:
+        entity = self._entities_by_id.pop(entity_id, None)
+
+        env_id: str | None = None
+        for candidate_env_id, entities in self._entities_by_env.items():
+            if any(current.id == entity_id for current in entities):
+                env_id = candidate_env_id
+                break
+
+        if env_id is None:
+            raise SimulacBaseError(f"No entity id: {entity_id!r}")
+
+        env = self.__get_env(env_id)
+
+        env.stuffs[:] = [item for item in env.stuffs if item.id != entity_id]
+        env.machines[:] = [item for item in env.machines if item.id != entity_id]
+        env.cameras[:] = [item for item in env.cameras if item.id != entity_id]
+        env.lights[:] = [item for item in env.lights if item.id != entity_id]
+
+        self._entities_by_env[env_id][:] = [
+            item for item in self._entities_by_env[env_id] if item.id != entity_id
+        ]
+
+        env.relations[:] = [
+            op for op in env.relations if not self.__mentions_entity(op, entity_id)
+        ]
+        env.constraints[:] = [
+            constraint
+            for constraint in env.constraints
+            if not self.__mentions_entity(constraint, entity_id)
+        ]
 
     def change_pos(self, entity_id: str, pos: Tuple[float, float, float]):
         self.__get_entity(entity_id).pos = pos
