@@ -373,6 +373,9 @@ class MujocoRunner(IRunner):
                 },
             }
 
+            if entity.init_position is not None:
+                candidate[eid]["joint_pos"] = sampler.sample(entity.init_position)
+
         for eid, entity in self._camera_entities.items():
             candidate[eid] = {
                 "pos": sampler.sample(entity.pos),
@@ -501,6 +504,18 @@ class MujocoRunner(IRunner):
             if mass is not None:
                 self._apply_stuff_mass(binding, mass)
 
+        for eid, values in candidate.items():
+            if eid not in self._machine_bindings:
+                continue
+
+            joint_pos = values.get("joint_pos")
+            if joint_pos is not None:
+                self._apply_machine_joint_pos(
+                    self._machine_bindings[eid], list(joint_pos)
+                )
+
+        mujoco.mj_forward(self.mj_model, data)
+
     def _entity_binding(
         self,
         entity_id: str,
@@ -578,6 +593,38 @@ class MujocoRunner(IRunner):
         )
 
         self._apply_camera_pose(binding, camera_pos, camera_quat)
+
+    def _apply_machine_joint_pos(
+        self,
+        binding: MujocoRobotBinding,
+        joint_pos: list[float],
+    ) -> None:
+        data = self._require_data()
+        cursor = 0
+
+        for joint_id in binding.joint_ids:
+            if joint_id == binding.root_freejoint_id:
+                continue
+
+            joint_type = int(self.mj_model.jnt_type[joint_id])
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                qpos_dim = 7
+            elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                qpos_dim = 4
+            else:
+                qpos_dim = 1
+
+            if cursor + qpos_dim > len(joint_pos):
+                raise SimulacBaseError("joint_pos size mismatch")
+
+            qadr = int(self.mj_model.jnt_qposadr[joint_id])
+            data.qpos[qadr : qadr + qpos_dim] = [
+                float(value) for value in joint_pos[cursor : cursor + qpos_dim]
+            ]
+            cursor += qpos_dim
+
+        if cursor != len(joint_pos):
+            raise SimulacBaseError("joint_pos size mismatch")
 
     def _apply_look_at_op(
         self,
