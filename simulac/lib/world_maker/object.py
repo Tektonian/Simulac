@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
@@ -215,7 +216,7 @@ class Environment:
             )
             return cast(
                 "RobotObject[ActionT]",
-                RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL),
+                RobotObject(env_robot_obj, _create_sentinal=_CREATE_SENTINAL, env=self),
             )
         elif isinstance(entity, Camera):
             if fixed is not None:
@@ -289,7 +290,7 @@ class Environment:
                 return StuffObject(obj, _create_sentinal=_CREATE_SENTINAL, env=self)
         for obj in env.machines:
             if obj.id == object_id:
-                return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL)
+                return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL, env=self)
         for obj in env.lights:
             if obj.id == object_id:
                 return LightObject(obj, _create_sentinal=_CREATE_SENTINAL)
@@ -451,7 +452,7 @@ class StuffObject:
         """
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        return JointRef(self._entity.id, name, _build_ops=self._entity.build_ops)
+        return JointRef(self._entity.id, name)
 
     def anchor(self, name: str) -> AnchorRef:
         if self._entity.id is None:
@@ -461,19 +462,28 @@ class StuffObject:
     # end-region
 
     def set_mass(self, mass: RandomizableFloat) -> None:
-        # do assertion first
-        # self._env._assert_mutate()
-        ...
+        self._env._assert_mutable()
+        self._entity.mass = mass
 
-    def set_pos(self, pos: RandomizableVec3) -> None: ...
-    def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_size(self, size: RandomizableVec3) -> None: ...
+    def set_pos(self, pos: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.pos = pos
+
+    def set_rot(self, rot: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.rot = rot
+
+    def set_size(self, size: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.size = size
+
     def set_fixed(self, is_fixed: bool) -> None:
         self._env._assert_mutable()
-
         self._entity.fixed = is_fixed
 
-    def set_friction(self, friction: RandomizableFloat) -> None: ...
+    def set_friction(self, friction: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._entity.friction = friction
 
 
 class RobotObject(Generic[ActionT]):
@@ -488,11 +498,23 @@ class RobotObject(Generic[ActionT]):
             raise SimulacBaseError("Please do not create stuff object directly")
 
         self._entity = entity
+        self._env = env
 
-    def set_pos(self, pos: RandomizableVec3) -> None: ...
-    def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_joint_pos(self, pos: Randomizable[ActionT]) -> None: ...
+    def set_pos(self, pos: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.pos = pos
 
+    def set_rot(self, rot: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.rot = rot
+
+    def set_joint_pos(self, pos: Randomizable[ActionT]) -> None:
+        self._env._assert_mutable()
+        self._entity.init_position = pos
+
+    # TODO: @gangjeuk
+    # Need discussion
+    # For implementation, we need to parse asset a `built-time`, which increases cost and responsibility of `RobotObject`
     def get_joint_min(self) -> ActionT: ...
     def get_joint_max(self) -> ActionT: ...
 
@@ -503,12 +525,12 @@ class RobotObject(Generic[ActionT]):
     def joint(self, name: str) -> JointRef:
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        return JointRef(self._entity.id, name, _build_ops=self._entity.build_ops)
+        return JointRef(self._entity.id, name)
 
     def collider(self, name: str) -> ColliderRef:
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        return ColliderRef(self._entity.id, name, _build_ops=self._entity.build_ops)
+        return ColliderRef(self._entity.id, name)
 
     def anchor(self, name: str) -> AnchorRef:
         if self._entity.id is None:

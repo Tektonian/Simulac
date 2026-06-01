@@ -474,52 +474,9 @@ class MujocoAdapter(IPhysicsEngineAdapter):
                 mocap_id=int(model.body_mocapid[body_id]),
             )
 
-        joints: dict[str, MujocoJointBinding] = {}
-        for joint_id in joint_ids:
-            joint_full_name = (
-                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
-                or f"joint_{joint_id}"
-            )
-            joint_name = (
-                joint_full_name.split("/", 1)[1]
-                if joint_full_name.startswith(f"{entity_id}/")
-                else joint_full_name
-            )
-
-            joint_type = int(model.jnt_type[joint_id])
-            qpos_dim, qvel_dim = (1, 1)
-            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
-                qpos_dim, qvel_dim = (7, 6)
-            if joint_type == mujoco.mjtJoint.mjJNT_BALL:
-                qpos_dim, qvel_dim = (4, 3)
-
-            limited = bool(model.jnt_limited[joint_id])
-            joint_range: tuple[float, float] | None = None
-            if limited:
-                joint_range = (
-                    float(model.jnt_range[joint_id][0]),
-                    float(model.jnt_range[joint_id][1]),
-                )
-
-            joints[joint_name] = MujocoJointBinding(
-                entity_id=entity_id,
-                full_name=joint_full_name,
-                name=joint_name,
-                joint_id=joint_id,
-                body_id=int(model.jnt_bodyid[joint_id]),
-                joint_type=joint_type,
-                qpos_addr=int(model.jnt_qposadr[joint_id]),
-                qvel_addr=int(model.jnt_dofadr[joint_id]),
-                qpos_dim=qpos_dim,
-                qvel_dim=qvel_dim,
-                axis=(
-                    float(model.jnt_axis[joint_id][0]),
-                    float(model.jnt_axis[joint_id][1]),
-                    float(model.jnt_axis[joint_id][2]),
-                ),
-                range=joint_range,
-                limited=limited,
-            )
+        joints: dict[str, MujocoJointBinding] = self.__build_joint_bindings(
+            entity_id, joint_ids
+        )
 
         actuators: dict[str, MujocoActuatorBinding] = {}
         for actuator_id in actuator_ids:
@@ -659,6 +616,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             joint_ids=joint_ids,
             actuator_ids=actuator_ids,
         )
+        joints = self.__build_joint_bindings(entity_id, joint_ids)
         return MujocoStuffBinding(
             entity_id=entity_id,
             root_body_id=root_body_id,
@@ -671,6 +629,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             sites=sites,
             sensors=sensors,
             root_freejoint_id=root_freejoint_id,
+            joints=joints,
             mocap_id=int(self.model.body_mocapid[root_body_id]),
         )
 
@@ -822,3 +781,64 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             )
 
         return sensors
+
+    def __build_joint_bindings(
+        self,
+        entity_id: str,
+        joint_ids: list[int],
+    ) -> dict[str, MujocoJointBinding]:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        joints: dict[str, MujocoJointBinding] = {}
+
+        for joint_id in joint_ids:
+            joint_full_name = (
+                mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+                or f"joint_{joint_id}"
+            )
+            joint_name = (
+                joint_full_name.split("/", 1)[1]
+                if joint_full_name.startswith(f"{entity_id}/")
+                else joint_full_name
+            )
+
+            joint_type = int(self.model.jnt_type[joint_id])
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                qpos_dim, qvel_dim = 7, 6
+            elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                qpos_dim, qvel_dim = 4, 3
+            else:
+                qpos_dim, qvel_dim = 1, 1
+
+            limited = bool(self.model.jnt_limited[joint_id])
+            joint_range = (
+                (
+                    float(self.model.jnt_range[joint_id][0]),
+                    float(self.model.jnt_range[joint_id][1]),
+                )
+                if limited
+                else None
+            )
+
+            joints[joint_name] = MujocoJointBinding(
+                entity_id=entity_id,
+                full_name=joint_full_name,
+                name=joint_name,
+                joint_id=joint_id,
+                body_id=int(self.model.jnt_bodyid[joint_id]),
+                joint_type=joint_type,
+                qpos_addr=int(self.model.jnt_qposadr[joint_id]),
+                qvel_addr=int(self.model.jnt_dofadr[joint_id]),
+                qpos_dim=qpos_dim,
+                qvel_dim=qvel_dim,
+                axis=(
+                    float(self.model.jnt_axis[joint_id][0]),
+                    float(self.model.jnt_axis[joint_id][1]),
+                    float(self.model.jnt_axis[joint_id][2]),
+                ),
+                range=joint_range,
+                limited=limited,
+            )
+
+        return joints

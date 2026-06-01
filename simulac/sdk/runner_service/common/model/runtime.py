@@ -6,6 +6,34 @@ if TYPE_CHECKING:
     from simulac.base.types.geometry import Quat, Vec3
 
 
+def _joint_state(ops: IJointRuntimeOps, name: str) -> JointState:
+    """Common joint parts for all physics engine"""
+    joint_type = ops.get_joint_type(name)
+    if joint_type == "hinge":
+        return HingeJointState(ops, name)
+    if joint_type == "slide":
+        return SlideJointState(ops, name)
+    if joint_type == "ball":
+        return BallJointState(ops, name)
+    return FreeJointState(ops, name)
+
+
+class IJointRuntimeOps(Protocol):
+    def get_joint_type(
+        self, name: str
+    ) -> Literal["hinge", "slide", "ball", "free"]: ...
+    def get_joint_scalar_pos(self, name: str) -> float: ...
+    def get_joint_scalar_vel(self, name: str) -> float: ...
+    def get_joint_free_pos(self, name: str) -> Vec3: ...
+    def get_joint_quat(self, name: str) -> Quat: ...
+    def get_joint_linear_vel(self, name: str) -> Vec3: ...
+    def get_joint_angular_vel(self, name: str) -> Vec3: ...
+    def get_joint_axis(self, name: str) -> Vec3: ...
+    def get_joint_limited(self, name: str) -> bool: ...
+    def get_joint_range(self, name: str) -> tuple[float, float] | None: ...
+    def get_joint_force(self, name: str) -> float: ...
+
+
 class LinkState:
     def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
         self._ops = ops
@@ -59,7 +87,7 @@ class SiteState:
 
 
 class _JointStateBase:
-    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+    def __init__(self, ops: IJointRuntimeOps, name: str) -> None:
         self._ops = ops
         self.name = name
 
@@ -250,7 +278,7 @@ class RuntimeState:
 
 
 @runtime_checkable
-class IStuffRuntimeOps(Protocol):
+class IStuffRuntimeOps(IJointRuntimeOps, Protocol):
     def get_pos(self) -> Vec3: ...
     def get_quat(self) -> Quat: ...
     def get_mass(self) -> float: ...
@@ -291,11 +319,16 @@ class StuffRuntime:
     def change_friction(self, friction: float) -> None:
         self._ops.change_friction(friction)
 
+    def joint(self, name: str) -> JointState:
+        return _joint_state(self._ops, name)
 
-class IRobotRuntimeOps(Protocol):
+
+class IRobotRuntimeOps(IJointRuntimeOps, Protocol):
+    # Robot object itself
     def get_base_pos(self) -> Vec3: ...
     def get_base_quat(self) -> Quat: ...
 
+    # Robot joint
     def get_joint_pos(self) -> list[float]: ...
     def get_joint_vel(self) -> list[float]: ...
 
@@ -314,16 +347,24 @@ class IRobotRuntimeOps(Protocol):
     def get_joint_range(self, name: str) -> tuple[float, float] | None: ...
     def get_joint_force(self, name: str) -> float: ...
 
+    # Sensors on robot
+    def get_sensor_value(self, name: str) -> tuple[float, ...]: ...
+    def get_sensor_dim(self, name: str) -> int: ...
+    def get_sensor_type(self, name: str) -> int: ...
+
+    # Sites
     def get_site_pos(self, name: str) -> Vec3: ...
     def get_site_quat(self, name: str) -> Quat: ...
     def get_site_linear_vel(self, name: str) -> Vec3: ...
     def get_site_angular_vel(self, name: str) -> Vec3: ...
 
+    # Links
     def get_link_pos(self, name: str) -> Vec3: ...
     def get_link_quat(self, name: str) -> Quat: ...
     def get_link_linear_vel(self, name: str) -> Vec3: ...
     def get_link_angular_vel(self, name: str) -> Vec3: ...
 
+    # control ops
     def change_joint_pos(self, joint_pos: list[float]) -> None: ...
     def change_joint_vel(self, joint_vel: list[float]) -> None: ...
     def set_control(self, action: list[float]) -> None: ...
@@ -347,14 +388,10 @@ class RobotRuntime:
         return self._ops.get_joint_vel()
 
     def joint(self, name: str) -> JointState:
-        joint_type = self._ops.get_joint_type(name)
-        if joint_type == "hinge":
-            return HingeJointState(self._ops, name)
-        if joint_type == "slide":
-            return SlideJointState(self._ops, name)
-        if joint_type == "ball":
-            return BallJointState(self._ops, name)
-        return FreeJointState(self._ops, name)
+        return _joint_state(self._ops, name)
+
+    def sensor(self, name: str) -> SensorState:
+        return SensorState(self._ops, name)
 
     def site(self, name: str) -> SiteState:
         return SiteState(self._ops, name)
@@ -446,3 +483,21 @@ class IAreaLightRuntimeOps(Protocol):
 class IDirectionalLightRuntimeOps(Protocol):
     def get_direction(self) -> Vec3: ...
     def change_direction(self, direction: Vec3) -> None: ...
+
+
+class SensorState:
+    def __init__(self, ops: IRobotRuntimeOps, name: str) -> None:
+        self._ops = ops
+        self.name = name
+
+    @property
+    def value(self) -> tuple[float, ...]:
+        return self._ops.get_sensor_value(self.name)
+
+    @property
+    def dim(self) -> int:
+        return self._ops.get_sensor_dim(self.name)
+
+    @property
+    def type(self) -> int:
+        return self._ops.get_sensor_type(self.name)
