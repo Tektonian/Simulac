@@ -571,6 +571,26 @@ class MujocoRobotRuntimeOps(IRobotRuntimeOps):
             float(vel[2]),
         )
 
+    def get_sensor_value(self, name: str) -> tuple[float, ...]:
+        sensor = self.__require_sensor(name)
+        values = self._data.sensordata[sensor.adr : sensor.adr + sensor.dim]
+        return tuple(float(value) for value in values)
+
+    def get_sensor_dim(self, name: str) -> int:
+        return self.__require_sensor(name).dim
+
+    def get_sensor_type(self, name: str) -> int:
+        return self.__require_sensor(name).sensor_type
+
+    def __require_sensor(self, name: str):
+        sensor = self._binding.sensors.get(name)
+        if sensor is None:
+            known = ", ".join(sorted(self._binding.sensors)) or "<none>"
+            raise SimulacBaseError(
+                f"No sensor {name!r} on robot {self.id!r}. Known sensors: {known}"
+            )
+        return sensor
+
     def get_link_pos(self, name: str) -> tuple[float, float, float]:
         link = self._binding.links.get(name)
         if link is None:

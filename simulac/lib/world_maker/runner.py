@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         FreeJointState,
         HingeJointState,
         LinkState,
+        SensorState,
         SiteState,
         SlideJointState,
     )
@@ -141,6 +142,9 @@ class RobotRuntime(Generic[ActionT]):
         self, name: str
     ) -> HingeJointState | SlideJointState | BallJointState | FreeJointState:
         return self._runtime.joint(name)
+
+    def sensor(self, name: str):
+        return self._runtime.sensor(name)
 
     def collider(self, name: str) -> ColliderRef:
         return ColliderRef(self._runtime.id, name)
