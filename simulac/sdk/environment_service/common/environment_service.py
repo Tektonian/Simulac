@@ -348,10 +348,8 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             ref_model.SetEntityFixedOp,
             ref_model.SetEntityMassOp,
             ref_model.SetEntityFrictionOp,
-            ref_model.SetEntityDensityOp,
             ref_model.SetColliderSizeOp,
             ref_model.SetColliderFrictionOp,
-            ref_model.SetColliderDensityOp,
             ref_model.SetJointPosOp,
             ref_model.SetJointVelOp,
             ref_model.SetJointCtrlOp,
@@ -453,7 +451,6 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             "fixed": entity.fixed,
             "mass": self.__jsonable(entity.mass),
             "friction": self.__jsonable(entity.friction),
-            "density": self.__jsonable(entity.density),
         }
 
     def __dump_machine(

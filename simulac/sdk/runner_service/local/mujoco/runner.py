@@ -88,7 +88,6 @@ class _EntityCandidate(TypedDict):
     constraints: _CandidateConstraints
 
     mass: NotRequired[_SampledFloat]
-    density: NotRequired[_SampledFloat]
     friction: NotRequired[_SampledFloat]
     size: NotRequired[_SampledSize]
 
@@ -358,7 +357,7 @@ class MujocoRunner(IRunner):
                     "rot": sampler.constraints(entity.rot),
                 },
             }
-            for name in ("mass", "density", "friction", "size"):
+            for name in ("mass", "friction", "size"):
                 if hasattr(entity, name):
                     value = getattr(entity, name)
                     if value is not None:
@@ -495,10 +494,6 @@ class MujocoRunner(IRunner):
             friction = values.get("friction")
             if friction is not None:
                 self._apply_stuff_friction(binding, friction)
-
-            density = values.get("density")
-            if density is not None:
-                self._apply_stuff_density(binding, density)
 
             mass = values.get("mass")
             if mass is not None:

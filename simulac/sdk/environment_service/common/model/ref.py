@@ -115,9 +115,6 @@ class ColliderRef(ObjectRefBase):
     def set_friction(self, friction: RandomizableFloat) -> SetColliderFrictionOp:
         return SetColliderFrictionOp(self._target(), friction)
 
-    def set_density(self, density: RandomizableFloat) -> SetColliderDensityOp:
-        return SetColliderDensityOp(self._target(), density)
-
     def _target(self) -> ColliderRef:
         return ColliderRef(self.entity_id, self.name)
 
@@ -520,12 +517,6 @@ class SetEntityFrictionOp(BuildOpBase):
 
 
 @dataclass(frozen=True, slots=True)
-class SetEntityDensityOp(BuildOpBase):
-    entity: EntityRef
-    density: RandomizableFloat
-
-
-@dataclass(frozen=True, slots=True)
 class SetColliderSizeOp(BuildOpBase):
     target: ColliderRef
     size: RandomizableVec3
@@ -535,12 +526,6 @@ class SetColliderSizeOp(BuildOpBase):
 class SetColliderFrictionOp(BuildOpBase):
     target: ColliderRef
     friction: RandomizableFloat
-
-
-@dataclass(frozen=True, slots=True)
-class SetColliderDensityOp(BuildOpBase):
-    target: ColliderRef
-    density: RandomizableFloat
 
 
 @dataclass(frozen=True, slots=True)
@@ -749,10 +734,8 @@ type BuildOpType = (
     | SetEntityFixedOp
     | SetEntityMassOp
     | SetEntityFrictionOp
-    | SetEntityDensityOp
     | SetColliderSizeOp
     | SetColliderFrictionOp
-    | SetColliderDensityOp
     | SetJointPosOp
     | SetJointVelOp
     | SetJointCtrlOp
