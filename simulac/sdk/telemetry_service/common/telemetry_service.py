@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import atexit
 import json
 import time
@@ -17,14 +19,14 @@ from simulac.sdk.telemetry_service.common.telemetry import TelemetryLevelEnum
 @service_identifier("ITelemetryService")
 class ITelemetryService(ServiceIdentifier["ITelemetryService"]):
     @abstractmethod
-    def public_log(self, event_name: str, data: dict): ...
+    def public_log(self, event_name: str, data: dict[str, str]): ...
 
     @abstractmethod
-    def public_log2(self, event_name: str, data: dict):
+    def public_log2(self, event_name: str, data: dict[str, str]):
         """Use this when user agreement needed"""
 
     @abstractmethod
-    def public_error(self, event_name: str, data: dict): ...
+    def public_error(self, event_name: str, data: dict[str, str]): ...
 
 
 class TelemetryService(ITelemetryService):
