@@ -474,7 +474,6 @@ class StuffObject:
         self._entity.fixed = is_fixed
 
     def set_friction(self, friction: RandomizableFloat) -> None: ...
-    def set_density(self, density: RandomizableFloat) -> None: ...
 
 
 class RobotObject(Generic[ActionT]):
