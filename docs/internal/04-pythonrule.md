@@ -1,4 +1,11 @@
+# Basic rule
+
+1. Follow google python style guide
+2. For other cases, follow the rules below
+
 # Follow google
+
+- https://google.github.io/styleguide/pyguide.html
 
 # Comment rule
 
@@ -30,4 +37,26 @@ class FooFoo:
 Display lazy import with comment
 ```py
 # import super_big_package - lazy import
+```
+
+# Explicit if-else
+
+❌
+```python
+foo_or_bar: Literal["foo", "bar"] = "foo"
+
+if foo_or_bar == "foo":
+    print("FOOOO?")
+else:
+    print("BARRR!!")
+```
+
+✅
+```python
+foo_or_bar: Literal["foo", "bar"] = "foo"
+
+if foo_or_bar == "foo":
+    print("FOOOO?")
+else if foo_or_bar == "bar":
+    print("BARRR!!")
 ```
