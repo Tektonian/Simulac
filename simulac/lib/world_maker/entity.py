@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Sequence, Union
+from typing import TYPE_CHECKING, Generic, Literal, Sequence, Union
 
 from typing_extensions import TypeVar
 
@@ -10,10 +10,10 @@ from simulac.sdk.environment_service.common.model.entity import (
     AreaLightSpec,
     CameraMode,
     CameraSpec,
-    CameraType,
     LightSpec,
     PointLightSpec,
     SpotLightSpec,
+    TCameraType,
 )
 
 if TYPE_CHECKING:
@@ -36,10 +36,10 @@ class Robot(Generic[ActionT]):
         self.obj_uri_or_prebuilt_name = obj_uri_or_prebuilt_name
 
 
-class Camera:
+class Camera(Generic[TCameraType]):
     def __init__(
         self,
-        type: CameraType = "rgb",
+        type: TCameraType = "rgb",
         mode: CameraMode = "fixed",
         lookat: Union[RandomizableVec3, tuple[float, float, float]] = (0, 0, 0),
         fov: Union[RandomizableFloat, float] = 50.0,

@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         EnvironmentLightEntity,
         EnvironmentMachineEntity,
         EnvironmentStuffEntity,
+        TCameraType,
     )
     from simulac.sdk.environment_service.common.model.ref import (
         ObjectRefType,
@@ -47,6 +48,8 @@ if TYPE_CHECKING:
         RandomizableVec3,
         Vec3,
     )
+
+
 from .entity import (
     ActionT,
     AmbientLight,
@@ -56,6 +59,7 @@ from .entity import (
     Robot,
     SpotLight,
     Stuff,
+    TCameraType,
 )
 
 if TYPE_CHECKING:
@@ -125,14 +129,14 @@ class Environment:
     @overload
     def add_entity(
         self,
-        entity: Camera,
+        entity: Camera[TCameraType],
         pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
         *,
         fixed: bool | None = None,
-    ) -> CameraObject: ...
+    ) -> CameraObject[TCameraType]: ...
     @overload
     def add_entity(
         self,
@@ -157,14 +161,14 @@ class Environment:
     ) -> RobotObject[ActionT]: ...
     def add_entity(
         self,
-        entity: Stuff | Robot[ActionT] | Camera | LightType,
+        entity: Stuff | Robot[ActionT] | Camera[TCameraType] | LightType,
         pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
         *,
         fixed: bool | None = None,
-    ) -> StuffObject | RobotObject[ActionT] | CameraObject | LightObject:
+    ) -> StuffObject | RobotObject[ActionT] | CameraObject[TCameraType] | LightObject:
         """_summary_
 
         Args:
@@ -551,10 +555,10 @@ class RobotObject(Generic[ActionT]):
         return AnchorRef(self._entity.id, name)
 
 
-class CameraObject:
+class CameraObject(Generic[TCameraType]):
     def __init__(
         self,
-        entity: EnvironmentCameraEntity,
+        entity: EnvironmentCameraEntity[TCameraType],
         /,
         *,
         _create_sentinal: object,
@@ -586,9 +590,7 @@ class CameraObject:
 
     def set_type(
         self,
-        type: Literal[
-            "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
-        ],
+        type: Literal["rgb", "depth", "pointcloud", "segmentation"],
     ): ...
 
     # Needed? @gangjeuk
