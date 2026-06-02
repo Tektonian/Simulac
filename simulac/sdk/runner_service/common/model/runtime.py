@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, runtime_checkable
 
 if TYPE_CHECKING:
     from simulac.base.types.geometry import Quat, Vec3
@@ -430,6 +430,7 @@ class ICameraRuntimeOps(Protocol):
 
     def get_fov(self) -> float: ...
     def change_fov(self, fov: float) -> None: ...
+    def render(self, *, width: int = 640, height: int = 480) -> Any: ...
 
 
 class CameraRuntime:
@@ -454,6 +455,9 @@ class CameraRuntime:
 
     def change_fov(self, fov: float) -> None:
         self._ops.change_fov(fov)
+
+    def render(self, *, width: int = 640, height: int = 480) -> Any:
+        return self._ops.render(width=width, height=height)
 
 
 class ILightRuntimeOps(Protocol):

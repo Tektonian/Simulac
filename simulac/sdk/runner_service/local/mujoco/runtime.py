@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from array import array
 from math import sqrt
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import mujoco
 
@@ -15,6 +15,19 @@ from simulac.sdk.runner_service.common.model.runtime import (
     IRobotRuntimeOps,
     IStuffRuntimeOps,
 )
+
+if TYPE_CHECKING:
+    from simulac.sdk.environment_service.common.model.entity import (
+        EnvironmentCameraEntity,
+        EnvironmentLightEntity,
+        EnvironmentMachineEntity,
+        EnvironmentStuffEntity,
+    )
+    from simulac.sdk.runner_service.local.mujoco.binding import (
+        MujocoCameraBinding,
+        MujocoRobotBinding,
+        MujocoStuffBinding,
+    )
 
 
 def _wxyz_to_xyzw(quat: tuple[float, float, float, float]) -> list[float]:
@@ -785,11 +798,13 @@ class MujocoCameraRuntimeOps(ICameraRuntimeOps):
         model: mujoco.MjModel,
         data: mujoco.MjData,
         binding: MujocoCameraBinding,
+        entity: EnvironmentCameraEntity[Any],
     ) -> None:
         self.id = entity_id
         self._model = model
         self._data = data
         self._binding = binding
+        self._entity = entity
 
     def get_pos(self) -> tuple[float, float, float]:
         pos = self._data.xpos[self._binding.root_body_id]
@@ -830,6 +845,81 @@ class MujocoCameraRuntimeOps(ICameraRuntimeOps):
 
         self._model.cam_fovy[self._binding.camera_id] = float(fov)
         mujoco.mj_forward(self._model, self._data)
+
+    def render(self, *, width: int = 640, height: int = 480):
+        entity = self._entity
+
+        camera_type = entity.spec.type
+
+        # if camera_type == "pointcloud":
+        #     return self._render_pointcloud(entity=entity, width=width, height=height)
+
+        renderer = mujoco.Renderer(self._model, height=height, width=width)
+        try:
+            if camera_type == "depth":
+                renderer.enable_depth_rendering()
+                renderer.update_scene(self._data, camera=self._binding.camera_id)
+                return renderer.render().copy()
+
+            if camera_type == "segmentation":
+                renderer.enable_segmentation_rendering()
+                renderer.update_scene(self._data, camera=self._binding.camera_id)
+                return renderer.render().copy()
+
+            if camera_type == "rgb":
+                renderer.update_scene(self._data, camera=self._binding.camera_id)
+                return renderer.render().copy()
+
+            raise SimulacBaseError(f"Unsupported camera render type: {camera_type!r}")
+        finally:
+            renderer.close()
+
+    # TODO: @gangjeuk
+    # [ ] - Add pointcloud (need numpy package dependency)
+    # https://github.com/google-deepmind/mujoco/issues/1863
+    #
+    # def _render_pointcloud(self, *, entity:EnvironmentCameraEntity, width: int, height: int):
+    #     depth = self._render_depth(width=width, height=height).astype(
+    #         np.float32,
+    #         copy=False,
+    #     )
+
+    #     v, u = np.indices((height, width), dtype=np.float32)
+
+    #     fovy = np.deg2rad(float(self._model.cam_fovy[self._binding.camera_id]))
+    #     fy = 0.5 * float(height) / np.tan(0.5 * fovy)
+    #     fx = fy
+    #     cx = 0.5 * float(width)
+    #     cy = 0.5 * float(height)
+
+    #     z = depth
+    #     x = (u + 0.5 - cx) * z / fx
+    #     y = (v + 0.5 - cy) * z / fy
+
+    #     points_camera = np.stack((x, -y, -z), axis=-1)
+
+    #     camera_id = self._binding.camera_id
+    #     camera_pos = self._data.cam_xpos[camera_id].astype(np.float32, copy=False)
+    #     camera_rot = (
+    #         self._data.cam_xmat[camera_id]
+    #         .reshape(3, 3)
+    #         .astype(
+    #             np.float32,
+    #             copy=False,
+    #         )
+    #     )
+
+    #     points_world = points_camera @ camera_rot.T + camera_pos
+
+    #     extent = float(self._model.stat.extent)
+    #     near = float(self._model.vis.map.znear) * extent
+    #     far = float(self._model.vis.map.zfar) * extent
+    #     mask = np.isfinite(z) & (z > near) & (z < far * (1.0 - 1e-6))
+
+    #     return PointCloudFrame(
+    #         points=points_world.astype(np.float32, copy=False),
+    #         mask=mask,
+    #     )
 
 
 class MujocoLightRuntimeOps(ICameraRuntimeOps):

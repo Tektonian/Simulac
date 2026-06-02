@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, overload
 
 if TYPE_CHECKING:
     from .model.context import INativeContext
-    from .model.runtime import RobotRuntime, RuntimeState, StuffRuntime
+    from .model.runtime import CameraRuntime, RobotRuntime, RuntimeState, StuffRuntime
 
 
 @dataclass
@@ -42,7 +42,9 @@ class IRunner(ABC):
     def get_state(self) -> RuntimeState: ...
 
     @abstractmethod
-    def get_runtime_object(self, entity_id: str) -> StuffRuntime | RobotRuntime: ...
+    def get_runtime_object(
+        self, entity_id: str
+    ) -> StuffRuntime | RobotRuntime | CameraRuntime: ...
 
     @abstractmethod
     def clone_state(self) -> None: ...
