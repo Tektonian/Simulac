@@ -204,32 +204,6 @@ class MujocoRunner(IRunner):
         raise SimulacBaseError(f"There is no runtime object id '{entity_id}'")
 
     def snapshot(self): ...
-    def _native_snapshot(self, camera_id: str, *, width: int = 640, height: int = 480):
-        data = self._require_data()
-        binding = self._camera_bindings.get(camera_id)
-        if binding is None:
-            raise SimulacBaseError(f"No camera named {camera_id!r}")
-
-        entity = self._camera_entities[camera_id]
-
-        # self._apply_follow_ops()
-
-        renderer = mujoco.Renderer(self.mj_model, height=height, width=width)
-        try:
-            if entity.spec.type == "depth":
-                renderer.enable_depth_rendering()
-                renderer.update_scene(data, camera=binding.camera_id)
-                return renderer.render().copy()
-
-            if entity.spec.type == "segmentation":
-                renderer.enable_segmentation_rendering()
-                renderer.update_scene(data, camera=binding.camera_id)
-                return renderer.render().copy()
-
-            renderer.update_scene(data, camera=binding.camera_id)
-            return renderer.render().copy()
-        finally:
-            renderer.close()
 
     def set_state(self) -> None: ...
     def clone_state(self) -> None: ...
@@ -387,7 +361,7 @@ class MujocoRunner(IRunner):
         return candidate
 
     def _clean_runtimes(self) -> None:
-        self._runtimes: dict[str, StuffRuntime | RobotRuntime] = dict()
+        self._runtimes: dict[str, StuffRuntime | RobotRuntime | CameraRuntime] = dict()
 
     def _create_runtimes(self) -> None:
         for eid, binding in self._stuff_bindings.items():
@@ -408,8 +382,9 @@ class MujocoRunner(IRunner):
             robot_runtime = RobotRuntime(eid, ops)
             self._runtimes[eid] = robot_runtime
         for eid, binding in self._camera_bindings.items():
+            entity = self._camera_entities[eid]
             ops = MujocoCameraRuntimeOps(
-                eid, self.mj_model, self._require_data(), binding
+                eid, self.mj_model, self._require_data(), binding, entity
             )
             camera_runtime = CameraRuntime(eid, ops)
             self._runtimes[eid] = camera_runtime

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 AxisSide = Literal["right", "left", "front", "back", "up", "down"]
 SupportFrame = Literal["world", "local"]
 OffsetFrame = Literal["target", "world"]
-CameraType = Literal["rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"]
+CameraType = Literal["rgb", "depth", "pointcloud", "segmentation"]
 LightType = Literal["ambient", "pointlight", "rectarea", "reactarea", "spot", "area"]
 
 

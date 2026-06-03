@@ -6,6 +6,7 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
+from simulac.sdk.environment_service.common.model.entity import TCameraType
 from simulac.sdk.environment_service.common.model.ref import (
     ColliderRef,
 )
@@ -161,7 +162,7 @@ class RobotRuntime(Generic[ActionT]):
     def _change_target_force(self, force: float) -> None: ...
 
 
-class CameraRuntime:
+class CameraRuntime(Generic[TCameraType]):
     def __init__(
         self,
         runtime_object: SDKCameraRuntime,
@@ -193,6 +194,60 @@ class CameraRuntime:
         Needed?
         """
         self._runtime.change_fov(fov)
+
+    @overload
+    def render(
+        self: CameraRuntime[Literal["rgb"]],
+        *,
+        width: int = 640,
+        height: int = 480,
+    ) -> list[list[tuple[int, int, int]]]: ...
+
+    @overload
+    def render(
+        self: CameraRuntime[Literal["depth"]],
+        *,
+        width: int = 640,
+        height: int = 480,
+    ) -> list[list[float]]: ...
+
+    @overload
+    def render(
+        self: CameraRuntime[Literal["segmentation"]],
+        *,
+        width: int = 640,
+        height: int = 480,
+    ) -> list[list[tuple[int, int]]]: ...
+
+    @overload
+    def render(
+        self: CameraRuntime[Literal["pointcloud"]],
+        *,
+        width: int = 640,
+        height: int = 480,
+    ) -> tuple[
+        list[list[tuple[float, float, float]]],
+        list[list[bool]],
+    ]: ...
+
+    def render(self: CameraRuntime[Any], *, width: int = 640, height: int = 480):
+        """_summary_
+
+        Args:
+            width (int): _description_
+            height (int): _description_
+
+        Returns:
+            RGBFrame: rgb[height][width] -> (r, g, b)
+            DepthFrame: depth[height][width] -> distance
+            SegmentationFrame: segmentation[height][width] -> (object_id, object_type)
+            PointCloudFrame:
+                pointcloud = (points, mask)
+                points[height][width] -> (x, y, z)
+                mask[height][width] -> valid/invalid
+        """
+
+        return self._runtime.render(width=width, height=height)
 
 
 class LightRuntime:
@@ -300,10 +355,13 @@ class Runner:
     @overload
     def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
     @overload
-    def get_runtime_object(self, obj: CameraObject) -> CameraRuntime: ...
     def get_runtime_object(
-        self, obj: StuffObject | RobotObject[Any] | LightObject | CameraObject
-    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime:
+        self, obj: CameraObject[TCameraType]
+    ) -> CameraRuntime[TCameraType]: ...
+    def get_runtime_object(
+        self,
+        obj: StuffObject | RobotObject[Any] | LightObject | CameraObject[TCameraType],
+    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime[TCameraType]:
         if obj._entity.id is None:
             raise SimulacBaseError("Entity should be added before runtime initialized")
         runtime_object = self._runner.get_runtime_object(obj._entity.id)

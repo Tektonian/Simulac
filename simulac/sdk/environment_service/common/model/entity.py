@@ -157,15 +157,20 @@ class EnvironmentLightEntity:
     track: TrackSpec | None = None
 
 
-type CameraType = Literal[
-    "rgb", "tactile", "depth", "pointcloud", "normal", "segmentation"
-]
+TCameraType = TypeVar(
+    "TCameraType",
+    Literal["rgb"],
+    Literal["depth"],
+    Literal["segmentation"],
+    Literal["pointcloud"],
+    default=Literal["rgb"],
+)
 type CameraMode = Literal["fixed", "track"]
 
 
 @dataclass(frozen=True, slots=True)
-class CameraSpec:
-    type: CameraType = "rgb"
+class CameraSpec(Generic[TCameraType]):
+    type: TCameraType = cast(TCameraType, "rgb")
     mode: CameraMode = "track"
     lookat: RandomizableVec3 = (0, 0, 0)
     fov: RandomizableFloat = 50.0
@@ -175,10 +180,10 @@ class CameraSpec:
 
 
 @dataclass(slots=True)
-class EnvironmentCameraEntity:
+class EnvironmentCameraEntity(Generic[TCameraType]):
     id: str | None = None
     description: str = ""
-    spec: CameraSpec = field(default_factory=CameraSpec)
+    spec: CameraSpec[TCameraType] = field(default_factory=CameraSpec)
     pos: RandomizableVec3 = (0, 0, 0)
     rot: RandomizableVec3 = (0, 0, 0)
 
