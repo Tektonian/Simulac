@@ -140,7 +140,7 @@ class AreaLightSpec:
     height: RandomizableFloat = 1.0
 
 
-type LightType = Literal["ambient", "pointlight", "rectarea", "spot"]
+type LightType = Literal["ambient", "pointlight", "area", "spot"]
 type LightSpec = AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSpec
 
 

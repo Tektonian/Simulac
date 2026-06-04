@@ -461,9 +461,9 @@ class CameraRuntime:
 
 
 class ILightRuntimeOps(Protocol):
+    # common
     def get_pos(self) -> Vec3: ...
     def get_quat(self) -> Quat: ...
-
     def change_pos(self, pos: Vec3) -> None: ...
     def change_quat(self, quat: Quat) -> None: ...
 
@@ -474,19 +474,132 @@ class ILightRuntimeOps(Protocol):
     def change_intensity(self, intensity: float) -> None: ...
 
 
-class ISpotLightRuntimeOps(Protocol):
+class IAmbientLightRuntimeOps(ILightRuntimeOps, Protocol):
+    pass
+
+
+class IPointLightRuntimeOps(ILightRuntimeOps, Protocol):
+    def get_range(self) -> float: ...
+    def change_range(self, range: float) -> None: ...
+
+    def get_decay(self) -> float: ...
+    def change_decay(self, decay: float) -> None: ...
+
+
+class IDirectionalLightRuntimeOps(ILightRuntimeOps, Protocol):
+    def get_direction(self) -> Vec3: ...
+    def change_direction(self, direction: Vec3) -> None: ...
+
+
+class ISpotLightRuntimeOps(
+    IPointLightRuntimeOps, IDirectionalLightRuntimeOps, Protocol
+):
     def get_angle(self) -> float: ...
     def change_angle(self, angle: float) -> None: ...
 
+    def get_penumbra(self) -> float: ...
+    def change_penumbra(self, penumbra: float) -> None: ...
 
-class IAreaLightRuntimeOps(Protocol):
+
+class IAreaLightRuntimeOps(IDirectionalLightRuntimeOps, Protocol):
     def get_area_size(self) -> tuple[float, float]: ...
     def change_area_size(self, width: float, height: float) -> None: ...
 
 
-class IDirectionalLightRuntimeOps(Protocol):
-    def get_direction(self) -> Vec3: ...
-    def change_direction(self, direction: Vec3) -> None: ...
+class LightRuntime:
+    def __init__(self, entity_id: str, ops: ILightRuntimeOps) -> None:
+        self.id = entity_id
+        self._ops = ops
+
+    def get_pos(self) -> Vec3:
+        return self._ops.get_pos()
+
+    def get_quat(self) -> Quat:
+        return self._ops.get_quat()
+
+    def change_pos(self, pos: Vec3) -> None:
+        self._ops.change_pos(pos)
+
+    def change_quat(self, quat: Quat) -> None:
+        self._ops.change_quat(quat)
+
+    def get_color(self) -> tuple[float, float, float]:
+        return self._ops.get_color()
+
+    def change_color(self, color: tuple[float, float, float]) -> None:
+        self._ops.change_color(color)
+
+    def get_intensity(self) -> float:
+        return self._ops.get_intensity()
+
+    def change_intensity(self, intensity: float) -> None:
+        self._ops.change_intensity(intensity)
+
+
+class AmbientLightRuntime(LightRuntime):
+    def __init__(self, entity_id: str, ops: IAmbientLightRuntimeOps) -> None:
+        super().__init__(entity_id, ops)
+        self._ops = ops
+
+
+class PointLightRuntime(LightRuntime):
+    def __init__(self, entity_id: str, ops: IPointLightRuntimeOps) -> None:
+        super().__init__(entity_id, ops)
+        self._ops = ops
+
+    def get_range(self) -> float:
+        return self._ops.get_range()
+
+    def change_range(self, range: float) -> None:
+        self._ops.change_range(range)
+
+    def get_decay(self) -> float:
+        return self._ops.get_decay()
+
+    def change_decay(self, decay: float) -> None:
+        self._ops.change_decay(decay)
+
+
+class SpotLightRuntime(PointLightRuntime):
+    def __init__(self, entity_id: str, ops: ISpotLightRuntimeOps) -> None:
+        super().__init__(entity_id, ops)
+        self._ops = ops
+
+    def get_angle(self) -> float:
+        return self._ops.get_angle()
+
+    def change_angle(self, angle: float) -> None:
+        self._ops.change_angle(angle)
+
+    def get_direction(self) -> Vec3:
+        return self._ops.get_direction()
+
+    def change_direction(self, direction: Vec3) -> None:
+        self._ops.change_direction(direction)
+
+    def get_penumbra(self) -> float:
+        return self._ops.get_penumbra()
+
+    def change_penumbra(self, penumbra: float) -> None:
+        self._ops.change_penumbra(penumbra)
+
+
+class AreaLightRuntime(LightRuntime):
+    def __init__(self, entity_id: str, ops: IAreaLightRuntimeOps) -> None:
+        super().__init__(entity_id, ops)
+        self._ops = ops
+
+    def get_area_size(self) -> tuple[float, float]:
+        return self._ops.get_area_size()
+
+    def change_area_size(self, width: float, height: float) -> None:
+        self._ops.change_area_size(width, height)
+
+    def get_direction(self) -> Vec3:
+        return self._ops.get_direction()
+
+    def change_direction(self, direction: Vec3) -> None:
+        self._ops.change_direction(direction)
 
 
 class SensorState:
