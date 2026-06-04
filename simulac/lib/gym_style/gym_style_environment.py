@@ -59,7 +59,7 @@ __KEYERROR_MESSAGE = "\n".join(
 
 
 class BenchmarkEnvironment:
-    """Gym style benchmark environment."""
+    """Gym-style client for a remote benchmark environment."""
 
     def __init__(
         self,
@@ -105,6 +105,7 @@ class BenchmarkEnvironment:
         self._warned_step_before_reset = False
 
     def _is_network_alive(self):
+        """Return whether the local network appears reachable."""
         try:
             # Connect to Google's public DNS (8.8.8.8) on port 53
             socket.create_connection(("8.8.8.8", 53), timeout=5)
@@ -114,6 +115,7 @@ class BenchmarkEnvironment:
         return False
 
     def _create_ticket(self):
+        """Create a remote benchmark ticket for websocket connection."""
         url = f"{self._runtime.environment_variable.base_url}/container/{self.owner_id}/{self.world_id}/preflight"
         res = requests.post(
             url,
@@ -136,6 +138,11 @@ class BenchmarkEnvironment:
         self._ticket = payload.get("ticket", None)
 
     def _get_api_key(self) -> str:
+        """Return the configured API key for the benchmark service.
+
+        Raises:
+            SimulacBaseError: If no API key is configured.
+        """
         api_key = self._runtime.environment_variable.token
         if api_key is None:
             _API_KEY_ERROR_MESSAGE = "\n".join(
@@ -150,6 +157,7 @@ class BenchmarkEnvironment:
         return api_key
 
     def _build_ws_url(self) -> str:
+        """Build the websocket URL for the current benchmark ticket."""
         query_param = urllib.parse.urlencode({"ticket": self._ticket})
         base_url = urllib.parse.urlparse(self._runtime.environment_variable.base_url)
         ws_scheme = {"http": "ws", "https": "wss"}.get(base_url.scheme, "wss")
@@ -163,15 +171,13 @@ class BenchmarkEnvironment:
         ).geturl()
 
     def _ensure_connected(self) -> ClientConnection:
-        """Try socket connection and return socket.
-        Once connection made, socket requests to build env with `build_env` command.
-        In most code pattern, this function is used for lazy connection
+        """Create the websocket connection lazily and build the remote environment.
 
         Raises:
-            SimulacBaseError: Socket connection failed
+            SimulacBaseError: If the socket connection or environment build fails.
 
         Returns:
-            ClientConnection: client socket
+            Active client websocket connection.
         """
         # Timeout seconds and retry count are set explicitly
         # Because of cold-start of remote container
@@ -244,13 +250,16 @@ class BenchmarkEnvironment:
         /,
         **args: Any,
     ) -> None:
+        """Send one JSON command over the benchmark websocket."""
         socket.send(json.dumps({"command": command, "args": args}))
 
     def _receive_packed_message(self, socket: ClientConnection) -> dict:
+        """Receive and decode one compressed msgpack response."""
         payload = socket.recv(decode=False)
         return msgpack.unpackb(zstd.decompress(payload))
 
     def _drop_socket(self) -> None:
+        """Close and clear local websocket state."""
         if self._socket is not None:
             try:
                 self._socket.close()
@@ -261,6 +270,7 @@ class BenchmarkEnvironment:
         self._ticket = None
 
     def _parse_step_response(self, rcvd: dict) -> GymEnvStepReturnType:
+        """Parse a backend step response into the public Gym-style tuple."""
         try:
             return (
                 rcvd["obs"],
@@ -281,12 +291,14 @@ class BenchmarkEnvironment:
             raise
 
     def _step_once(self, action: list[float]) -> GymEnvStepReturnType:
+        """Send one step command without recovery handling."""
         socket = self._ensure_connected()
         self._send_command(socket, "step", action=list(action))
         rcvd = self._receive_packed_message(socket)
         return self._parse_step_response(rcvd)
 
     def _reset_once(self, seed: int) -> GymEnvResetReturnType:
+        """Send one reset command without recovery handling."""
         socket = self._ensure_connected()
         self._send_command(socket, "reset", seed=seed)
         rcvd = self._receive_packed_message(socket)
@@ -307,9 +319,11 @@ class BenchmarkEnvironment:
             raise
 
     def _set_error_recovery_enabled(self, enabled: bool):
+        """Enable or disable connection recovery for this environment."""
         self._error_recovery_enabled = enabled
 
     def _recover_and_replay(self, pending_action: list[float]) -> GymEnvStepReturnType:
+        """Reconnect, reset with the last seed, and replay actions after transport loss."""
         history = [list(action) for action in self.__step_history]
         actions_to_replay = history + [list(pending_action)]
 
@@ -360,6 +374,14 @@ class BenchmarkEnvironment:
         )
 
     def step(self, action: list[float]) -> GymEnvStepReturnType:
+        """Send one action to the remote environment.
+
+        Args:
+            action: Action vector for one environment step.
+
+        Returns:
+            Gym-style step tuple of observation, reward, done, and info.
+        """
         action_copy = list(action)
         recovered = False
 
@@ -390,6 +412,14 @@ class BenchmarkEnvironment:
         return result
 
     def reset(self, seed: int = 0) -> GymEnvResetReturnType:
+        """Reset the remote environment and clear replay history.
+
+        Args:
+            seed: Reset seed.
+
+        Returns:
+            Gym-style reset tuple of observation and info.
+        """
         result = self._reset_once(seed)
 
         self.__last_reset_seed = seed
@@ -402,6 +432,7 @@ class BenchmarkEnvironment:
         return result
 
     def close(self):
+        """Close the remote runner and drop local connection state."""
         self._has_reset = False
         self._warned_step_before_reset = False
         if self._socket is None:
@@ -419,13 +450,20 @@ class BenchmarkEnvironment:
 
 
 class BenchmarkVecEnvironment:
+    """Vectorized wrapper over multiple BenchmarkEnvironment instances."""
+
     def __init__(self, benchmark_envs: list[BenchmarkEnvironment]) -> None:
         self._benchmark_envs = benchmark_envs
         self._runtime = obtain_runtime()
 
     def step(self, actions: list[list[float]]) -> list[GymEnvStepReturnType]:
-        """Send step to all envs concurrently and gather responses.
-        Results are returned in the same order as the provided `envs` list.
+        """Step all benchmark environments and preserve input order.
+
+        Args:
+            actions: Action vectors aligned with the wrapped environments.
+
+        Returns:
+            Step results aligned with the wrapped environments.
         """
 
         if len(actions) != len(self._benchmark_envs):
@@ -471,6 +509,14 @@ class BenchmarkVecEnvironment:
         return ret
 
     def reset(self, seeds: list[int]) -> list[GymEnvResetReturnType]:
+        """Reset all benchmark environments and preserve input order.
+
+        Args:
+            seeds: Reset seeds aligned with the wrapped environments.
+
+        Returns:
+            Reset results aligned with the wrapped environments.
+        """
         if len(seeds) != len(self._benchmark_envs):
             self._runtime.logger.warn(
                 "\n".join(
@@ -506,6 +552,7 @@ class BenchmarkVecEnvironment:
         return ret
 
     def close(self):
+        """Close all benchmark environments."""
         with ThreadPoolExecutor(max_workers=len(self._benchmark_envs)) as ex:
             close_futs = [ex.submit(env.close) for env in self._benchmark_envs]
             for f in as_completed(close_futs):

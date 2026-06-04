@@ -76,10 +76,22 @@ _CREATE_SENTINAL = object()
 
 
 class Environment:
+    """Mutable build-time scene definition.
+
+    Environment objects may be changed until Runner creation. Runner freezes this
+    definition; runtime mutations must go through Runner.get_runtime_object(...).
+
+    Args:
+        env_uri_or_prebuilt_id: Optional environment URI or registered prebuilt id.
+        default_engine: Default physics engine used for this environment.
+    """
+
     def __init__(
         self,
         env_uri_or_prebuilt_id: str | None = None,
-        default_engine: Literal["mujoco", "newton", "genesis"] = "mujoco",
+        default_engine: Literal[
+            "mujoco"
+        ] = "mujoco",  # TODO: Literal["mujoco", "mujoco_warp", "newton", "genesis"] = "mujoco",
     ) -> None:
         self._runtime = obtain_runtime()
         self._world_maker = self._runtime.world_maker
@@ -91,9 +103,17 @@ class Environment:
         self.__frozen = False
 
     def _freeze(self):
+        """Prevent further build-time scene mutation."""
         self.__frozen = True
 
     def _assert_mutable(self):
+        """Raise if the build-time scene has already been frozen.
+        Call this function before call method of `*Object`, like `SutffObject.change_pos()`
+
+        Raises:
+            SimulacBaseError: If Runner creation already froze this Environment.
+        """
+
         if self.__frozen:
             raise SimulacBaseError(
                 "\n".join(
@@ -217,20 +237,29 @@ class Environment:
         | SpotLightObject
         | AreaLightObject
     ):
-        """_summary_
+        """Add a build-time entity and return its typed scene handle.
 
         Args:
-            entity (Stuff | Robot[ActionT] | Camera | LightType): _description_
-            pos (RandomizableVec3, optional): _description_. Defaults to (0, 0, 0).
-            rot (RandomizableVec3, optional): _description_. Defaults to (0, 0, 0).
-            entity_id (str | None, optional): _description_. Defaults to None.
-            description (str | None, optional): _description_. Defaults to None.
+            entity: Build-time entity descriptor.
+            pos: Initial position or point reference.
+            rot: Initial Euler rotation.
+            entity_id: Optional stable scene-level entity id.
+            description: Optional human-readable description.
+            fixed: Force whether a Stuff entity should be fixed.
+                We highly recommend editing asset file itself, not using `fixed` parameter.
 
-        Raises:
-            NotImplementedError: _description_
+                Behavior:
+                    - fixed=None keeps the asset's original mobility setting.
+                    - fixed=True requests a world-fixed object.
+                    - fixed=False requests a movable object.
+                    - Engine adapters may raise if the asset cannot be safely converted.
 
         Returns:
-            StuffObject | RobotObject[ActionT] | CameraObject | AmbientLightObject | PointLightObject | SpotLightObject | AreaLightObject: _description_
+            Typed build-time object handle for the added entity.
+
+        Raises:
+            SimulacBaseError: If `fixed` is used for unsupported entity types.
+            NotImplementedError: If an unsupported entity descriptor is provided.
         """
 
         description = description or ""
@@ -328,6 +357,12 @@ class Environment:
         | LightObject
         | str,
     ) -> None:
+        """Remove an entity from the build-time scene definition.
+        This function takes exact same effect with editing `Environment` `.json` file, but handles chore things.
+        Such as, cleaning `relations` and `constraints`
+        Args:
+            object_or_object_id: Build-time object handle or scene entity id.
+        """
         # TODO: @gangjeuk
         # [ ] - Remove object
         # [ ] - Remove relations and constraints connected to object
@@ -357,6 +392,14 @@ class Environment:
         | AreaLightObject
         | None
     ):
+        """Return the typed build-time handle for a scene entity id.
+
+        Args:
+            object_id: Scene-level entity id.
+
+        Returns:
+            Matching typed object handle, or None if no entity exists.
+        """
         env = self._env
         for obj in env.stuffs:
             if obj.id == object_id:
@@ -375,6 +418,8 @@ class Environment:
         return None
 
     def constraint(self, *constraints: SceneConstraint) -> None:
+        """Append scene constraints used during reset-time sampling."""
+
         self._env.constraints.extend(constraints)
 
     def dump_env_json(
@@ -385,6 +430,8 @@ class Environment:
         include_runtime_state: bool = False,
         validation: Literal["none", "warn", "raise"] = "warn",
     ) -> str:
+        """Serialize the current build-time environment definition."""
+
         return self._world_maker.dump_env_json(
             self._env.id,
             indent=indent,
@@ -403,6 +450,8 @@ class Environment:
         include_runtime_state: bool = False,
         validation: Literal["none", "warn", "raise"] = "warn",
     ) -> Path:
+        """Write the current build-time environment definition to disk."""
+
         return self._world_maker.save_env(
             self._env.id,
             path,
@@ -415,6 +464,12 @@ class Environment:
 
 
 class StuffObject:
+    """Build-time handle for a non-robot scene object.
+
+    A StuffObject mutates the scene definition before Runner creation. Runtime
+    changes must be made through the matching StuffRuntime handle.
+    """
+
     def __init__(
         self,
         entity: EnvironmentStuffEntity,
@@ -528,6 +583,14 @@ class StuffObject:
         return JointRef(self._entity.id, name)
 
     def anchor(self, name: str) -> AnchorRef:
+        """Return a named semantic anchor ref authored in the asset.
+
+        Args:
+            name: Asset-authored anchor name.
+
+        Returns:
+            Anchor reference scoped to this scene entity.
+        """
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return AnchorRef(self._entity.id, name)
@@ -535,31 +598,43 @@ class StuffObject:
     # end-region
 
     def set_mass(self, mass: RandomizableFloat) -> None:
+        """Set build-time mass override for this object."""
         self._env._assert_mutable()
         self._entity.mass = mass
 
     def set_pos(self, pos: RandomizableVec3) -> None:
+        """Set build-time position for this object."""
         self._env._assert_mutable()
         self._entity.pos = pos
 
     def set_rot(self, rot: RandomizableVec3) -> None:
+        """Set build-time Euler rotation for this object."""
         self._env._assert_mutable()
         self._entity.rot = rot
 
     def set_size(self, size: RandomizableVec3) -> None:
+        """Set build-time size override for this object."""
         self._env._assert_mutable()
         self._entity.size = size
 
     def set_fixed(self, is_fixed: bool) -> None:
+        """Set whether this object should be fixed in the scene."""
         self._env._assert_mutable()
         self._entity.fixed = is_fixed
 
     def set_friction(self, friction: RandomizableFloat) -> None:
+        """Set build-time friction override for this object."""
         self._env._assert_mutable()
         self._entity.friction = friction
 
 
 class RobotObject(Generic[ActionT]):
+    """Build-time handle for an articulated robot.
+
+    A RobotObject stores initial robot placement and joint state before Runner
+    creation. Runtime control must be made through RobotRuntime.
+    """
+
     def __init__(
         self,
         entity: EnvironmentMachineEntity,
@@ -575,14 +650,17 @@ class RobotObject(Generic[ActionT]):
         self._env = env
 
     def set_pos(self, pos: RandomizableVec3) -> None:
+        """Set build-time position for this robot."""
         self._env._assert_mutable()
         self._entity.pos = pos
 
     def set_rot(self, rot: RandomizableVec3) -> None:
+        """Set build-time Euler rotation for this robot."""
         self._env._assert_mutable()
         self._entity.rot = rot
 
     def set_joint_pos(self, pos: Randomizable[ActionT]) -> None:
+        """Set reset-time initial joint position for this robot."""
         self._env._assert_mutable()
         self._entity.init_position = pos
 
@@ -597,22 +675,31 @@ class RobotObject(Generic[ActionT]):
     """
 
     def joint(self, name: str) -> JointRef:
+        """Return a named joint ref scoped to this robot."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return JointRef(self._entity.id, name)
 
     def collider(self, name: str) -> ColliderRef:
+        """Return a named collider ref scoped to this robot."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return ColliderRef(self._entity.id, name)
 
     def anchor(self, name: str) -> AnchorRef:
+        """Return a named semantic anchor ref scoped to this robot."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return AnchorRef(self._entity.id, name)
 
 
 class CameraObject(Generic[TCameraType]):
+    """Build-time handle for a camera entity.
+
+    Camera placement and behavior are stored as build-time relation ops so refs
+    and randomization can be resolved consistently at reset time.
+    """
+
     def __init__(
         self,
         entity: EnvironmentCameraEntity[TCameraType],
@@ -627,16 +714,19 @@ class CameraObject(Generic[TCameraType]):
         self._env = env
 
     def set_pos(self, pos: RandomizableVec3) -> None:
+        """Set build-time camera position."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         self._env.relations.append(SetCameraPosOp(CameraRef(self._entity.id), pos))
 
     def set_rot(self, rot: RandomizableVec3) -> None:
+        """Set build-time camera Euler rotation."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         self._env.relations.append(SetCameraRotOp(CameraRef(self._entity.id), rot))
 
     def set_fov(self, fov: RandomizableFloat) -> None:
+        """Set build-time camera field of view."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         self._env.relations.append(SetCameraFovOp(CameraRef(self._entity.id), fov))
@@ -662,6 +752,7 @@ class CameraObject(Generic[TCameraType]):
         up: Vec3 = (0, 0, 1),
         offset: RandomizableVec3 = (0, 0, 0),
     ) -> None:
+        """Orient the camera toward a target point or reference."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
 
@@ -685,6 +776,7 @@ class CameraObject(Generic[TCameraType]):
         offset: RandomizableVec3 = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
     ) -> None:
+        """Attach the camera to an anchor."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
 
@@ -704,6 +796,7 @@ class CameraObject(Generic[TCameraType]):
         offset: RandomizableVec3 = (0, 0, 0),
         frame: Literal["world", "local"] = "world",
     ) -> None:
+        """Make the camera follow another object or reference."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
 
@@ -725,6 +818,12 @@ class CameraObject(Generic[TCameraType]):
 
 
 class LightObject:
+    """Build-time handle for common light properties.
+
+    LightObject mutates the scene definition before Runner creation. Runtime
+    light changes must be made through the matching LightRuntime handle.
+    """
+
     def __init__(
         self,
         entity: EnvironmentLightEntity,
@@ -739,27 +838,33 @@ class LightObject:
         self._env = env
 
     def ref(self, name: str | None = None) -> LightRef:
+        """Return a light ref scoped to this scene entity."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
         return LightRef(self._entity.id, name)
 
     def set_pos(self, pos: RandomizableVec3) -> None:
+        """Set build-time light position."""
         self._env._assert_mutable()
         self._entity.pos = pos
 
     def set_rot(self, rot: RandomizableVec3) -> None:
+        """Set build-time light Euler rotation."""
         self._env._assert_mutable()
         self._entity.rot = rot
 
     def set_intensity(self, intensity: RandomizableFloat) -> None:
+        """Set build-time light intensity."""
         self._env._assert_mutable()
         self._entity.spec.intensity = intensity
 
     def set_color(self, color: RandomizableColor) -> None:
+        """Set build-time light color."""
         self._env._assert_mutable()
         self._entity.spec.color = color
 
     def set_enabled(self, enabled: RandomizableBool) -> None:
+        """Set whether the light is enabled at build time."""
         self._env._assert_mutable()
         self._entity.spec.enabled = enabled
 
@@ -770,6 +875,7 @@ class LightObject:
         up: Vec3 = (0.0, 0.0, 1.0),
         offset: RandomizableVec3 = (0.0, 0.0, 0.0),
     ) -> None:
+        """Orient the light toward a target point or reference."""
         self._env._assert_mutable()
 
         if self._entity.id is None:
@@ -798,6 +904,7 @@ class LightObject:
         offset: RandomizableVec3 = (0.0, 0.0, 0.0),
         rot: RandomizableVec3 = (0.0, 0.0, 0.0),
     ) -> None:
+        """Attach the light to an anchor."""
         self._env._assert_mutable()
 
         if self._entity.id is None:

@@ -18,21 +18,19 @@ def init_bench(
     /,
     benchmark_specific: dict[str, Any] = {},
 ) -> BenchmarkEnvironment:
-    """Initalize benchmark service
+    """Create a remote benchmark environment handle.
 
     Args:
-        benchmark_id (str): Full benchmark id.\n
-            Example: benchmark_id="Tektonian/Metaworld"
-        env_id (str): Environment id of the benchmark.\n
-            Example: envid="reach-v3"
-            If you want to see the full list of the `env_id` visit https://tektonian.com/benchmark
-        seed (int, optional): Seed for inital state. Defaults to 0.
-        benchmark_specific (dict[str, Any], optional): Benchmark specific option field.\n
-            Also, if you want to know the full field and meaning please visit https://tektonian.com/benchmark\n
-            Defaults to {}.
+        benchmark_id: Full benchmark id in '<owner>/<benchmark>' format.
+        env_id: Environment id for the benchmark.
+        seed: Initial reset seed.
+        benchmark_specific: Benchmark-specific options passed to the backend.
 
     Returns:
-        ret (BenchmarkEnvironment):
+        BenchmarkEnvironment connected lazily on first use.
+
+    Raises:
+        SimulacBaseError: If the benchmark id format is invalid.
     """
     runtime = obtain_runtime()
     split_benchmark_id = benchmark_id.split("/")
@@ -81,6 +79,18 @@ def init_bench(
 
 
 def get_env_list(benchmark_id: str) -> list[str]:
+    """Fetch available environment ids for a benchmark.
+
+    Args:
+        benchmark_id: Full benchmark id in '<owner>/<benchmark>' format.
+
+    Returns:
+        Available benchmark environment ids.
+
+    Raises:
+        SimulacBaseError: If the benchmark id or backend response is invalid.
+    """
+
     # TODO: @gangjeuk
     # Remove group_id later
 
@@ -118,6 +128,15 @@ def get_env_list(benchmark_id: str) -> list[str]:
 
 
 def make_vec(envs: list[BenchmarkEnvironment]):
+    """Create a vectorized benchmark environment.
+
+    Args:
+        envs: Benchmark environments to wrap.
+
+    Returns:
+        BenchmarkVecEnvironment over the provided environments.
+    """
+
     for env in envs:
         env._set_error_recovery_enabled(True)
     vec_env = BenchmarkVecEnvironment(envs)

@@ -66,6 +66,8 @@ if TYPE_CHECKING:
 
 
 class StuffRuntime:
+    """Runtime handle for reading and mutating a non-robot object."""
+
     def __init__(
         self,
         runtime_object: SDKStuffRuntime,
@@ -78,15 +80,19 @@ class StuffRuntime:
         self._runtime = runtime_object
 
     def change_mass(self, mass: float) -> None:
+        """Change the runtime mass of this object."""
         self._runtime.change_mass(mass)
 
     def change_pos(self, pos: Vec3) -> None:
+        """Change the runtime position of this object."""
         self._runtime.change_pos(pos)
 
     def change_rot(self, rot: Vec3) -> None:
+        """Change the runtime Euler rotation of this object."""
         self._runtime.change_quat(euler_to_quat(*rot))
 
     def change_friction(self, friction: float) -> None:
+        """Change the runtime friction of this object."""
         self._runtime.change_friction(friction)
 
     @property
@@ -100,28 +106,26 @@ class StuffRuntime:
         return self._runtime.get_quat()
 
     def collider(self, name: str) -> ColliderRef:
+        """Return a collider ref scoped to this runtime object."""
         return ColliderRef(self._runtime.id, name)
 
     def joint(
         self, name: str
     ) -> SlideJointState | HingeJointState | BallJointState | FreeJointState:
-        """Runtime joint control
-        See object.py:StuffObject
-        TODO: @gangjeuk
-        implement code
+        """Return runtime state for a named joint.
 
-        # common api
-        joint = runtime_obj.joint("joint_name")
+        Args:
+            name: Asset-authored joint name.
 
-        joint.get_pos()
-        joint.get_vel()
-        joint.change_pos(Vec3)
-        joint.change_target(value)
+        Returns:
+            Runtime joint state matching the engine joint type.
         """
         return self._runtime.joint(name)
 
 
 class RobotRuntime(Generic[ActionT]):
+    """Runtime handle for robot control and articulated state."""
+
     def __init__(
         self,
         runtime_object: SDKRobotRuntime,
@@ -134,6 +138,7 @@ class RobotRuntime(Generic[ActionT]):
         self._runtime = runtime_object
 
     def set_control(self, action: ActionT) -> None:
+        """Write robot control values used by the next Runner.tick() call."""
         self._runtime.set_control(list(action))
 
     @property
@@ -153,26 +158,33 @@ class RobotRuntime(Generic[ActionT]):
         return self._runtime.get_joint_vel()
 
     def site(self, name: str) -> SiteState:
+        """Return runtime state for a named robot site."""
         return self._runtime.site(name)
 
     def link(self, name: str) -> LinkState:
+        """Return runtime state for a named robot link."""
         return self._runtime.link(name)
 
     def joint(
         self, name: str
     ) -> HingeJointState | SlideJointState | BallJointState | FreeJointState:
+        """Return runtime state for a named robot joint."""
         return self._runtime.joint(name)
 
     def sensor(self, name: str):
+        """Return runtime state for a named robot sensor."""
         return self._runtime.sensor(name)
 
     def collider(self, name: str) -> ColliderRef:
+        """Return a collider ref scoped to this robot."""
         return ColliderRef(self._runtime.id, name)
 
     def change_joint_pos(self, joint_pos: list[float]) -> None:
+        """Change the robot joint position vector."""
         self._runtime.change_joint_pos(joint_pos)
 
     def change_joint_vel(self, joint_vel: list[float]) -> None:
+        """Change the robot joint velocity vector."""
         self._runtime.change_joint_vel(joint_vel)
 
     # NOTE: below two are future use,
@@ -182,6 +194,8 @@ class RobotRuntime(Generic[ActionT]):
 
 
 class CameraRuntime(Generic[TCameraType]):
+    """Runtime handle for camera pose, field of view, and rendering."""
+
     def __init__(
         self,
         runtime_object: SDKCameraRuntime,
@@ -200,18 +214,18 @@ class CameraRuntime(Generic[TCameraType]):
         return self._runtime.get_quat()
 
     def change_pos(self, pos: Vec3) -> None:
+        """Change the runtime camera position."""
         self._runtime.change_pos(pos)
 
     def change_rot(self, rot: Vec3) -> None:
+        """Change the runtime camera Euler rotation."""
         self._runtime.change_quat(euler_to_quat(*rot))
 
     def get_fov(self) -> float:
         return self._runtime.get_fov()
 
     def change_fov(self, fov: float) -> None:
-        """for zoom mocking
-        Needed?
-        """
+        """Change the runtime camera field of view."""
         self._runtime.change_fov(fov)
 
     @overload
@@ -250,11 +264,11 @@ class CameraRuntime(Generic[TCameraType]):
     ]: ...
 
     def render(self: CameraRuntime[Any], *, width: int = 640, height: int = 480):
-        """_summary_
+        """Render one frame using this camera's declared output type.
 
         Args:
-            width (int): _description_
-            height (int): _description_
+            width: Output frame width.
+            height: Output frame height.
 
         Returns:
             RGBFrame: rgb[height][width] -> (r, g, b)
@@ -270,6 +284,8 @@ class CameraRuntime(Generic[TCameraType]):
 
 
 class LightRuntime:
+    """Runtime handle for common light state."""
+
     def __init__(
         self,
         runtime_object: SDKLightRuntime,
@@ -292,25 +308,31 @@ class LightRuntime:
         return self._runtime.get_quat()
 
     def change_pos(self, pos: Vec3) -> None:
+        """Change the runtime light position."""
         self._runtime.change_pos(pos)
 
     def change_rot(self, rot: Vec3) -> None:
+        """Change the runtime light Euler rotation."""
         self._runtime.change_quat(euler_to_quat(*rot))
 
     def get_intensity(self) -> float:
         return self._runtime.get_intensity()
 
     def change_intensity(self, intensity: float) -> None:
+        """Change the runtime light intensity."""
         self._runtime.change_intensity(intensity)
 
     def get_color(self) -> ColorRgb:
         return self._runtime.get_color()
 
     def change_color(self, color: ColorRgb) -> None:
+        """Change the runtime light color."""
         self._runtime.change_color(color)
 
 
 class AmbientLightRuntime(LightRuntime):
+    """Runtime handle for ambient light state."""
+
     def __init__(
         self,
         runtime_object: SDKAmbientLightRuntime,
@@ -324,6 +346,8 @@ class AmbientLightRuntime(LightRuntime):
 
 
 class PointLightRuntime(LightRuntime):
+    """Runtime handle for point-light-specific state."""
+
     def __init__(
         self,
         runtime_object: SDKPointLightRuntime,
@@ -339,16 +363,20 @@ class PointLightRuntime(LightRuntime):
         return self._runtime.get_range()
 
     def change_range(self, range: float) -> None:
+        """Change the runtime point light range."""
         self._runtime.change_range(range)
 
     def get_decay(self) -> float:
         return self._runtime.get_decay()
 
     def change_decay(self, decay: float) -> None:
+        """Change the runtime point light decay."""
         self._runtime.change_decay(decay)
 
 
 class SpotLightRuntime(LightRuntime):
+    """Runtime handle for spot-light-specific state."""
+
     def __init__(
         self,
         runtime_object: SDKSpotLightRuntime,
@@ -364,34 +392,41 @@ class SpotLightRuntime(LightRuntime):
         return self._runtime.get_range()
 
     def change_range(self, range: float) -> None:
+        """Change the runtime spot light range."""
         self._runtime.change_range(range)
 
     def get_decay(self) -> float:
         return self._runtime.get_decay()
 
     def change_decay(self, decay: float) -> None:
+        """Change the runtime spot light decay."""
         self._runtime.change_decay(decay)
 
     def get_angle(self) -> float:
         return self._runtime.get_angle()
 
     def change_angle(self, angle: float) -> None:
+        """Change the runtime spot light cone angle."""
         self._runtime.change_angle(angle)
 
     def get_direction(self) -> Vec3:
         return self._runtime.get_direction()
 
     def change_direction(self, direction: Vec3) -> None:
+        """Change the runtime spot light direction."""
         self._runtime.change_direction(direction)
 
     def get_penumbra(self) -> float:
         return self._runtime.get_penumbra()
 
     def change_penumbra(self, penumbra: float) -> None:
+        """Change the runtime spot light penumbra."""
         self._runtime.change_penumbra(penumbra)
 
 
 class AreaLightRuntime(LightRuntime):
+    """Runtime handle for area-light-specific state."""
+
     def __init__(
         self,
         runtime_object: SDKAreaLightRuntime,
@@ -407,12 +442,14 @@ class AreaLightRuntime(LightRuntime):
         return self._runtime.get_area_size()
 
     def change_area_size(self, width: float, height: float) -> None:
+        """Change the runtime area light size."""
         self._runtime.change_area_size(width, height)
 
     def get_direction(self) -> Vec3:
         return self._runtime.get_direction()
 
     def change_direction(self, direction: Vec3) -> None:
+        """Change the runtime area light direction."""
         self._runtime.change_direction(direction)
 
 
@@ -447,6 +484,8 @@ class ParallelRunner:
 
 
 class Runner:
+    """Runtime owner for a frozen Environment definition."""
+
     def __init__(
         self,
         env: Environment,
@@ -475,16 +514,20 @@ class Runner:
     #     return self._runner.step(action)
 
     def tick(self) -> RuntimeState:
+        """Advance the runtime by one configured tick duration."""
         return self._runner.tick()
 
     def reset(self, seed: int | None = 0) -> RuntimeState:
+        """Reset the runtime and return the latest state."""
         return self._runner.reset(seed)
 
     def sync(self) -> RuntimeState:
+        """Synchronize and return the latest runtime state."""
         return self._runner.sync()
 
     @property
     def state(self) -> RuntimeState:
+        """Current runtime state."""
         return self._runner.get_state()
 
     @overload
@@ -520,6 +563,7 @@ class Runner:
         | LightRuntime
         | CameraRuntime[TCameraType]
     ):
+        """Return the typed runtime handle corresponding to a build-time object."""
         if obj._entity.id is None:
             raise SimulacBaseError("Entity should be added before runtime initialized")
         runtime_object = self._runner.get_runtime_object(obj._entity.id)
@@ -561,13 +605,13 @@ class Runner:
     def context(
         self, engine: None | Literal["mujoco"]
     ) -> INativeContext | MujocoNativeContext:
-        """Return physics engine native context
+        """Return the native engine context for low-level engine-specific access.
 
         Args:
-            engine (None | Literal[&quot;mujoco&quot;]): Engine name. Ignore it, it's just for typing.
+            engine (None | Literal[&quot;mujoco&quot;]): Optional engine literal used for static typing.
 
         Returns:
-            INativeContext | MujocoNativeContext: _description_
+            Native context for the active runtime engine.
         """
         return self._runner.context(engine or "")
 
