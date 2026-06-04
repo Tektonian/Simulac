@@ -10,15 +10,43 @@ from simulac.sdk.environment_service.common.model.entity import TCameraType
 from simulac.sdk.environment_service.common.model.ref import (
     ColliderRef,
 )
+from simulac.sdk.runner_service.common.model.runtime import (
+    AmbientLightRuntime as SDKAmbientLightRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    AreaLightRuntime as SDKAreaLightRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    CameraRuntime as SDKCameraRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    LightRuntime as SDKLightRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    PointLightRuntime as SDKPointLightRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    RobotRuntime as SDKRobotRuntime,
+)
 from simulac.sdk.runner_service.common.model.runtime import RuntimeState
+from simulac.sdk.runner_service.common.model.runtime import (
+    SpotLightRuntime as SDKSpotLightRuntime,
+)
+from simulac.sdk.runner_service.common.model.runtime import (
+    StuffRuntime as SDKStuffRuntime,
+)
 
 from .entity import ActionT
 from .object import (
     _CREATE_SENTINAL,
+    AmbientLightObject,
+    AreaLightObject,
     CameraObject,
     Environment,
     LightObject,
+    PointLightObject,
     RobotObject,
+    SpotLightObject,
     StuffObject,
 )
 
@@ -32,15 +60,6 @@ if TYPE_CHECKING:
         SensorState,
         SiteState,
         SlideJointState,
-    )
-    from simulac.sdk.runner_service.common.model.runtime import (
-        CameraRuntime as SDKCameraRuntime,
-    )
-    from simulac.sdk.runner_service.common.model.runtime import (
-        RobotRuntime as SDKRobotRuntime,
-    )
-    from simulac.sdk.runner_service.common.model.runtime import (
-        StuffRuntime as SDKStuffRuntime,
     )
     from simulac.sdk.runner_service.common.runner import IRunner
     from simulac.sdk.runner_service.local.mujoco.context import MujocoNativeContext
@@ -253,26 +272,148 @@ class CameraRuntime(Generic[TCameraType]):
 class LightRuntime:
     def __init__(
         self,
+        runtime_object: SDKLightRuntime,
         /,
         *,
         _create_sentinal: object,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create light runtime directly")
+        self._runtime: SDKLightRuntime = runtime_object
 
-    def change_pos(self, pos: Vec3) -> None: ...
-    def change_rot(self, rot: Vec3) -> None: ...
-    def change_intensity(self, intensity: float) -> None: ...
-    def change_color(self, color: tuple[int, int, int]) -> None: ...
+    @property
+    def id(self) -> str:
+        return self._runtime.id
 
-    def change_angle(self, angle: float) -> None: ...
-    def change_area_size(self, width: float, height: float) -> None: ...
-    def look_at(
+    def get_pos(self) -> Vec3:
+        return self._runtime.get_pos()
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        return self._runtime.get_quat()
+
+    def change_pos(self, pos: Vec3) -> None:
+        self._runtime.change_pos(pos)
+
+    def change_rot(self, rot: Vec3) -> None:
+        self._runtime.change_quat(euler_to_quat(*rot))
+
+    def get_intensity(self) -> float:
+        return self._runtime.get_intensity()
+
+    def change_intensity(self, intensity: float) -> None:
+        self._runtime.change_intensity(intensity)
+
+    def get_color(self) -> tuple[float, float, float]:
+        return self._runtime.get_color()
+
+    def change_color(self, color: tuple[float, float, float]) -> None:
+        self._runtime.change_color(color)
+
+
+class AmbientLightRuntime(LightRuntime):
+    def __init__(
         self,
-        target: Any,
+        runtime_object: SDKAmbientLightRuntime,
+        /,
         *,
-        up: Vec3 = (0, 0, 1),
-    ) -> None: ...
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create light runtime directly")
+        self._runtime: SDKAmbientLightRuntime = runtime_object
+
+
+class PointLightRuntime(LightRuntime):
+    def __init__(
+        self,
+        runtime_object: SDKPointLightRuntime,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create light runtime directly")
+        self._runtime: SDKPointLightRuntime = runtime_object
+
+    def get_range(self) -> float:
+        return self._runtime.get_range()
+
+    def change_range(self, range: float) -> None:
+        self._runtime.change_range(range)
+
+    def get_decay(self) -> float:
+        return self._runtime.get_decay()
+
+    def change_decay(self, decay: float) -> None:
+        self._runtime.change_decay(decay)
+
+
+class SpotLightRuntime(LightRuntime):
+    def __init__(
+        self,
+        runtime_object: SDKSpotLightRuntime,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create light runtime directly")
+        self._runtime: SDKSpotLightRuntime = runtime_object
+
+    def get_range(self) -> float:
+        return self._runtime.get_range()
+
+    def change_range(self, range: float) -> None:
+        self._runtime.change_range(range)
+
+    def get_decay(self) -> float:
+        return self._runtime.get_decay()
+
+    def change_decay(self, decay: float) -> None:
+        self._runtime.change_decay(decay)
+
+    def get_angle(self) -> float:
+        return self._runtime.get_angle()
+
+    def change_angle(self, angle: float) -> None:
+        self._runtime.change_angle(angle)
+
+    def get_direction(self) -> Vec3:
+        return self._runtime.get_direction()
+
+    def change_direction(self, direction: Vec3) -> None:
+        self._runtime.change_direction(direction)
+
+    def get_penumbra(self) -> float:
+        return self._runtime.get_penumbra()
+
+    def change_penumbra(self, penumbra: float) -> None:
+        self._runtime.change_penumbra(penumbra)
+
+
+class AreaLightRuntime(LightRuntime):
+    def __init__(
+        self,
+        runtime_object: SDKAreaLightRuntime,
+        /,
+        *,
+        _create_sentinal: object,
+    ) -> None:
+        if _create_sentinal is not _CREATE_SENTINAL:
+            raise SimulacBaseError("Please do not create light runtime directly")
+        self._runtime: SDKAreaLightRuntime = runtime_object
+
+    def get_area_size(self) -> tuple[float, float]:
+        return self._runtime.get_area_size()
+
+    def change_area_size(self, width: float, height: float) -> None:
+        self._runtime.change_area_size(width, height)
+
+    def get_direction(self) -> Vec3:
+        return self._runtime.get_direction()
+
+    def change_direction(self, direction: Vec3) -> None:
+        self._runtime.change_direction(direction)
 
 
 class ParallelRunner:
@@ -353,6 +494,14 @@ class Runner:
         self, obj: RobotObject[ActionT]
     ) -> RobotRuntime[ActionT]: ...
     @overload
+    def get_runtime_object(self, obj: AmbientLightObject) -> AmbientLightRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: PointLightObject) -> PointLightRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: SpotLightObject) -> SpotLightRuntime: ...
+    @overload
+    def get_runtime_object(self, obj: AreaLightObject) -> AreaLightRuntime: ...
+    @overload
     def get_runtime_object(self, obj: LightObject) -> LightRuntime: ...
     @overload
     def get_runtime_object(
@@ -361,7 +510,16 @@ class Runner:
     def get_runtime_object(
         self,
         obj: StuffObject | RobotObject[Any] | LightObject | CameraObject[TCameraType],
-    ) -> StuffRuntime | RobotRuntime[Any] | LightRuntime | CameraRuntime[TCameraType]:
+    ) -> (
+        StuffRuntime
+        | RobotRuntime[Any]
+        | AmbientLightRuntime
+        | PointLightRuntime
+        | SpotLightRuntime
+        | AreaLightRuntime
+        | LightRuntime
+        | CameraRuntime[TCameraType]
+    ):
         if obj._entity.id is None:
             raise SimulacBaseError("Entity should be added before runtime initialized")
         runtime_object = self._runner.get_runtime_object(obj._entity.id)
@@ -371,6 +529,20 @@ class Runner:
 
         if isinstance(obj, RobotObject):
             return RobotRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, AmbientLightObject):
+            return AmbientLightRuntime(
+                runtime_object, _create_sentinal=_CREATE_SENTINAL
+            )
+
+        if isinstance(obj, PointLightObject):
+            return PointLightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, SpotLightObject):
+            return SpotLightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
+
+        if isinstance(obj, AreaLightObject):
+            return AreaLightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
 
         if isinstance(obj, LightObject):
             return LightRuntime(runtime_object, _create_sentinal=_CREATE_SENTINAL)
