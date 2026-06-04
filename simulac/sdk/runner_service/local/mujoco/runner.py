@@ -1134,6 +1134,11 @@ class MujocoRunner(IRunner):
             entity_id = op.entity.entity_id
             binding = self._entity_binding(entity_id)
 
+            if binding.root_body_id is None:
+                raise SimulacBaseError(
+                    f"Entity {entity_id!r} does not have a root body for placement"
+                )
+
             target_ref = sampler.sample(op.target)
             target_point = resolver.resolve_point(target_ref)
 
@@ -1154,7 +1159,10 @@ class MujocoRunner(IRunner):
                 float(target_point[2]) - float(source_point[2]),
             ]
 
-            if binding.root_freejoint_id >= 0:
+            if (
+                isinstance(binding, (MujocoStuffBinding, MujocoRobotBinding))
+                and binding.root_freejoint_id >= 0
+            ):
                 qadr = int(self.mj_model.jnt_qposadr[binding.root_freejoint_id])
                 data.qpos[qadr : qadr + 3] = [
                     float(data.qpos[qadr]) + delta[0],
