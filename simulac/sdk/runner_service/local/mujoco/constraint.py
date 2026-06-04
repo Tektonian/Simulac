@@ -17,7 +17,6 @@ from simulac.sdk.environment_service.common.model.constraint import (
 )
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
-    MujocoLightBinding,
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
@@ -85,8 +84,7 @@ class MujocoConstraintEvaluator:
             str,
             MujocoRobotBinding
             | MujocoStuffBinding
-            | MujocoCameraBinding
-            | MujocoLightBinding,
+            | MujocoCameraBinding,
         ],
     ) -> None:
         self.model = model

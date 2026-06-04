@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 from .entity import AmbientLight, AreaLight, Camera, PointLight, Robot, SpotLight, Stuff
-from .object import CameraObject, Environment, LightObject, RobotObject, StuffObject
+from .object import (
+    AmbientLightObject,
+    AreaLightObject,
+    CameraObject,
+    Environment,
+    LightObject,
+    PointLightObject,
+    RobotObject,
+    SpotLightObject,
+    StuffObject,
+)
 from .randomize import (
     Randomize,
 )
@@ -19,5 +29,9 @@ __all__ = [
     "StuffObject",
     "CameraObject",
     "LightObject",
+    "AmbientLightObject",
+    "PointLightObject",
+    "SpotLightObject",
+    "AreaLightObject",
     "Randomize",
 ]

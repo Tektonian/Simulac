@@ -17,7 +17,7 @@ AxisSide = Literal["right", "left", "front", "back", "up", "down"]
 SupportFrame = Literal["world", "local"]
 OffsetFrame = Literal["target", "world"]
 CameraType = Literal["rgb", "depth", "pointcloud", "segmentation"]
-LightType = Literal["ambient", "pointlight", "rectarea", "reactarea", "spot", "area"]
+LightType = Literal["ambient", "pointlight", "spot", "area"]
 
 
 class RefBase:
@@ -675,12 +675,6 @@ class SetLightRotOp(BuildOpBase):
 
 
 @dataclass(frozen=True, slots=True)
-class SetLightTypeOp(BuildOpBase):
-    light: LightRef
-    type: LightType
-
-
-@dataclass(frozen=True, slots=True)
 class SetLightIntensityOp(BuildOpBase):
     light: LightRef
     intensity: RandomizableFloat
@@ -758,7 +752,6 @@ type BuildOpType = (
     # | SetCameraExposureOp
     | SetLightPosOp
     | SetLightRotOp
-    | SetLightTypeOp
     | SetLightIntensityOp
     | SetLightColorOp
     | SetLightAngleOp

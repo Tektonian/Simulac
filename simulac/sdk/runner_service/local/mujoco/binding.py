@@ -133,6 +133,7 @@ class MujocoSensorBinding:
     adr: int
     dim: int
 
+
 @dataclass(slots=True)
 class MujocoCameraBinding:
     entity_id: str
@@ -145,4 +146,20 @@ class MujocoCameraBinding:
     root_body_id: int | None
     root_body_name: str | None
     root_body_full_name: str | None
+    mocap_id: int = -1
+
+
+@dataclass(slots=True)
+class MujocoLightBinding:
+    entity_id: str
+
+    light_id: int
+    light_name: str
+    light_full_name: str
+
+    root_body_id: int
+    root_body_name: str
+    root_body_full_name: str
+
+    light_type: str
     mocap_id: int = -1

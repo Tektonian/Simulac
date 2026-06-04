@@ -40,6 +40,7 @@ from simulac.sdk.environment_service.common.randomize import Randomizable
 from simulac.sdk.runner_service.common.sampler import ResetSampler
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
+    MujocoLightBinding,
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
@@ -779,12 +780,14 @@ class MujocoPlacementResolver:
         stuff_bindings: dict[str, MujocoStuffBinding],
         machine_bindings: dict[str, MujocoRobotBinding],
         camera_bindings: dict[str, MujocoCameraBinding],
+        light_bindings: dict[str, MujocoLightBinding],
     ) -> None:
         self.data = data
         self.resolver = resolver
         self._stuff_bindings = stuff_bindings
         self._machine_bindings = machine_bindings
         self._camera_bindings = camera_bindings
+        self._light_bindings = light_bindings
 
     def resolve_entity_pos(
         self,
@@ -856,7 +859,12 @@ class MujocoPlacementResolver:
     def __binding(
         self,
         entity_id: str,
-    ) -> MujocoStuffBinding | MujocoRobotBinding | MujocoCameraBinding:
+    ) -> (
+        MujocoStuffBinding
+        | MujocoRobotBinding
+        | MujocoCameraBinding
+        | MujocoLightBinding
+    ):
         binding = self._stuff_bindings.get(entity_id)
         if binding is not None:
             return binding
@@ -866,6 +874,10 @@ class MujocoPlacementResolver:
             return binding
 
         binding = self._camera_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self._light_bindings.get(entity_id)
         if binding is not None:
             return binding
 

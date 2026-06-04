@@ -6,6 +6,12 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 from simulac.base.error.error import SimulacBaseError
 from simulac.sdk import obtain_runtime
+from simulac.sdk.environment_service.common.model.entity import (
+    AmbientLightSpec,
+    AreaLightSpec,
+    PointLightSpec,
+    SpotLightSpec,
+)
 from simulac.sdk.environment_service.common.model.ref import (
     AnchorRef,
     AttachOp,
@@ -14,6 +20,7 @@ from simulac.sdk.environment_service.common.model.ref import (
     EntityRef,
     FollowOp,
     JointRef,
+    LightRef,
     LookAtOp,
     PlaceOp,
     SetCameraFovOp,
@@ -140,14 +147,47 @@ class Environment:
     @overload
     def add_entity(
         self,
-        entity: LightType,
+        entity: AmbientLight,
         pos: RandomizableVec3 | PointRefType = (0, 0, 0),
         rot: RandomizableVec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
         *,
         fixed: bool | None = None,
-    ) -> LightObject: ...
+    ) -> AmbientLightObject: ...
+    @overload
+    def add_entity(
+        self,
+        entity: PointLight,
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
+        entity_id: str | None = None,
+        description: str | None = None,
+        *,
+        fixed: bool | None = None,
+    ) -> PointLightObject: ...
+    @overload
+    def add_entity(
+        self,
+        entity: SpotLight,
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
+        entity_id: str | None = None,
+        description: str | None = None,
+        *,
+        fixed: bool | None = None,
+    ) -> SpotLightObject: ...
+    @overload
+    def add_entity(
+        self,
+        entity: AreaLight,
+        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
+        rot: RandomizableVec3 = (0, 0, 0),
+        entity_id: str | None = None,
+        description: str | None = None,
+        *,
+        fixed: bool | None = None,
+    ) -> AreaLightObject: ...
     @overload
     def add_entity(
         self,
@@ -168,7 +208,15 @@ class Environment:
         description: str | None = None,
         *,
         fixed: bool | None = None,
-    ) -> StuffObject | RobotObject[ActionT] | CameraObject[TCameraType] | LightObject:
+    ) -> (
+        StuffObject
+        | RobotObject[ActionT]
+        | CameraObject[TCameraType]
+        | AmbientLightObject
+        | PointLightObject
+        | SpotLightObject
+        | AreaLightObject
+    ):
         """_summary_
 
         Args:
@@ -182,7 +230,7 @@ class Environment:
             NotImplementedError: _description_
 
         Returns:
-            StuffObject | RobotObject[ActionT] | CameraObject | LightObject: _description_
+            StuffObject | RobotObject[ActionT] | CameraObject | AmbientLightObject | PointLightObject | SpotLightObject | AreaLightObject: _description_
         """
 
         description = description or ""
@@ -257,7 +305,7 @@ class Environment:
             self._world_maker.add_entity(
                 self._env.id, env_light_obj, entity_id, pos=pos, rot=rot
             )
-            return LightObject(env_light_obj, _create_sentinal=_CREATE_SENTINAL)
+            return _create_light_object(env_light_obj, env=self)
 
         # Should not reach
         raise NotImplementedError("Wrong entity")
@@ -299,7 +347,16 @@ class Environment:
 
     def get_object(
         self, object_id: str
-    ) -> StuffObject | RobotObject[Any] | CameraObject | LightObject | None:
+    ) -> (
+        StuffObject
+        | RobotObject[Any]
+        | CameraObject
+        | AmbientLightObject
+        | PointLightObject
+        | SpotLightObject
+        | AreaLightObject
+        | None
+    ):
         env = self._env
         for obj in env.stuffs:
             if obj.id == object_id:
@@ -309,7 +366,7 @@ class Environment:
                 return RobotObject(obj, _create_sentinal=_CREATE_SENTINAL, env=self)
         for obj in env.lights:
             if obj.id == object_id:
-                return LightObject(obj, _create_sentinal=_CREATE_SENTINAL)
+                return _create_light_object(obj, env=self)
         for obj in env.cameras:
             if obj.id == object_id:
                 return CameraObject(
@@ -674,40 +731,184 @@ class LightObject:
         /,
         *,
         _create_sentinal: object,
+        env: Environment,
     ) -> None:
         if _create_sentinal is not _CREATE_SENTINAL:
-            raise SimulacBaseError("Please do not create stuff object directly")
+            raise SimulacBaseError("Please do not create light object directly")
         self._entity = entity
+        self._env = env
 
-    def set_pos(self, pos: RandomizableVec3) -> None: ...
-    def set_rot(self, rot: RandomizableVec3) -> None: ...
-    def set_intensity(self, intensity: RandomizableFloat) -> None: ...
-    def set_type(
-        self, type: Literal["ambient", "pointlight", "reactarea", "spot"]
-    ) -> None: ...
-    def set_color(self, color: RandomizableColor) -> None: ...
+    def ref(self, name: str | None = None) -> LightRef:
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+        return LightRef(self._entity.id, name)
 
-    def set_angle(self, angle: RandomizableFloat) -> None:
-        """spot only"""
+    def set_pos(self, pos: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.pos = pos
 
-    def set_area_size(
-        self, width: RandomizableFloat, height: RandomizableFloat
-    ) -> None:
-        """area only"""
+    def set_rot(self, rot: RandomizableVec3) -> None:
+        self._env._assert_mutable()
+        self._entity.rot = rot
 
-    # Below two are for headlight
+    def set_intensity(self, intensity: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._entity.spec.intensity = intensity
+
+    def set_color(self, color: RandomizableColor) -> None:
+        self._env._assert_mutable()
+        self._entity.spec.color = color
+
+    def set_enabled(self, enabled: RandomizableBool) -> None:
+        self._env._assert_mutable()
+        self._entity.spec.enabled = enabled
+
     def look_at(
         self,
         target: Vec3 | AnchorRef | ColliderRef,
         *,
-        up: Vec3,
-        offset: RandomizableVec3,
-    ) -> None: ...
+        up: Vec3 = (0.0, 0.0, 1.0),
+        offset: RandomizableVec3 = (0.0, 0.0, 0.0),
+    ) -> None:
+        self._env._assert_mutable()
+
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+
+        if isinstance(target, AnchorRef):
+            target_ref = target.pos
+        elif isinstance(target, ColliderRef):
+            target_ref = target.center
+        else:
+            target_ref = WorldPointRef(target)
+
+        self._env._env.relations.append(
+            LookAtOp(
+                EntityRef(self._entity.id),
+                target_ref,
+                offset=offset,
+                up=up,
+            )
+        )
 
     def attach_to(
         self,
         parent: AnchorRef,
         *,
-        offset: RandomizableVec3,
-        rot: RandomizableVec3,
-    ) -> None: ...
+        offset: RandomizableVec3 = (0.0, 0.0, 0.0),
+        rot: RandomizableVec3 = (0.0, 0.0, 0.0),
+    ) -> None:
+        self._env._assert_mutable()
+
+        if self._entity.id is None:
+            raise SimulacBaseError("Entity must be added to Environment first")
+
+        self._env._env.relations.append(
+            AttachOp(
+                EntityRef(self._entity.id),
+                parent,
+                offset=offset,
+                rot=rot,
+            )
+        )
+
+
+class AmbientLightObject(LightObject):
+    @property
+    def _spec(self) -> AmbientLightSpec:
+        if not isinstance(self._entity.spec, AmbientLightSpec):
+            raise SimulacBaseError("Light entity is not AmbientLight")
+        return self._entity.spec
+
+
+class PointLightObject(LightObject):
+    @property
+    def _spec(self) -> PointLightSpec:
+        if not isinstance(self._entity.spec, PointLightSpec):
+            raise SimulacBaseError("Light entity is not PointLight")
+        return self._entity.spec
+
+    def set_range(self, range: RandomizableFloat | None) -> None:
+        self._env._assert_mutable()
+        self._spec.range = range
+
+    def set_decay(self, decay: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._spec.decay = decay
+
+
+class SpotLightObject(LightObject):
+    @property
+    def _spec(self) -> SpotLightSpec:
+        if not isinstance(self._entity.spec, SpotLightSpec):
+            raise SimulacBaseError("Light entity is not SpotLight")
+        return self._entity.spec
+
+    def set_range(self, range: RandomizableFloat | None) -> None:
+        self._env._assert_mutable()
+        self._spec.range = range
+
+    def set_decay(self, decay: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._spec.decay = decay
+
+    def set_angle(self, angle: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._spec.angle = angle
+
+    def set_penumbra(self, penumbra: RandomizableFloat) -> None:
+        self._env._assert_mutable()
+        self._spec.penumbra = penumbra
+
+
+class AreaLightObject(LightObject):
+    @property
+    def _spec(self) -> AreaLightSpec:
+        if not isinstance(self._entity.spec, AreaLightSpec):
+            raise SimulacBaseError("Light entity is not AreaLight")
+        return self._entity.spec
+
+    def set_area_size(
+        self,
+        width: RandomizableFloat,
+        height: RandomizableFloat,
+    ) -> None:
+        self._env._assert_mutable()
+        self._spec.width = width
+        self._spec.height = height
+
+
+def _create_light_object(
+    entity: EnvironmentLightEntity,
+    *,
+    env: Environment,
+) -> AmbientLightObject | PointLightObject | SpotLightObject | AreaLightObject:
+    if isinstance(entity.spec, AmbientLightSpec):
+        return AmbientLightObject(
+            entity,
+            _create_sentinal=_CREATE_SENTINAL,
+            env=env,
+        )
+
+    if isinstance(entity.spec, PointLightSpec):
+        return PointLightObject(
+            entity,
+            _create_sentinal=_CREATE_SENTINAL,
+            env=env,
+        )
+
+    if isinstance(entity.spec, SpotLightSpec):
+        return SpotLightObject(
+            entity,
+            _create_sentinal=_CREATE_SENTINAL,
+            env=env,
+        )
+
+    if isinstance(entity.spec, AreaLightSpec):
+        return AreaLightObject(
+            entity,
+            _create_sentinal=_CREATE_SENTINAL,
+            env=env,
+        )
+
+    raise SimulacBaseError(f"Unsupported light spec: {type(entity.spec).__name__}")
