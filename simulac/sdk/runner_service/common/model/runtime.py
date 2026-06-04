@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, runtime_checkable
 
 if TYPE_CHECKING:
-    from simulac.base.types.geometry import Quat, Vec3
+    from simulac.base.types.geometry import ColorRgb, Quat, Vec3
 
 
 def _joint_state(ops: IJointRuntimeOps, name: str) -> JointState:
@@ -467,8 +467,8 @@ class ILightRuntimeOps(Protocol):
     def change_pos(self, pos: Vec3) -> None: ...
     def change_quat(self, quat: Quat) -> None: ...
 
-    def get_color(self) -> tuple[float, float, float]: ...
-    def change_color(self, color: tuple[float, float, float]) -> None: ...
+    def get_color(self) -> ColorRgb: ...
+    def change_color(self, color: ColorRgb) -> None: ...
 
     def get_intensity(self) -> float: ...
     def change_intensity(self, intensity: float) -> None: ...
@@ -523,10 +523,10 @@ class LightRuntime:
     def change_quat(self, quat: Quat) -> None:
         self._ops.change_quat(quat)
 
-    def get_color(self) -> tuple[float, float, float]:
+    def get_color(self) -> ColorRgb:
         return self._ops.get_color()
 
-    def change_color(self, color: tuple[float, float, float]) -> None:
+    def change_color(self, color: ColorRgb) -> None:
         self._ops.change_color(color)
 
     def get_intensity(self) -> float:

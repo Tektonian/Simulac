@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Generic, Literal, overload
 
 from simulac.base.error.error import SimulacBaseError
-from simulac.base.types.geometry import Vec3
+from simulac.base.types.geometry import ColorRgb, Vec3
 from simulac.base.utils.rotation import euler_to_quat
 from simulac.sdk import obtain_runtime
 from simulac.sdk.environment_service.common.model.entity import TCameraType
@@ -303,10 +303,10 @@ class LightRuntime:
     def change_intensity(self, intensity: float) -> None:
         self._runtime.change_intensity(intensity)
 
-    def get_color(self) -> tuple[float, float, float]:
+    def get_color(self) -> ColorRgb:
         return self._runtime.get_color()
 
-    def change_color(self, color: tuple[float, float, float]) -> None:
+    def change_color(self, color: ColorRgb) -> None:
         self._runtime.change_color(color)
 
 

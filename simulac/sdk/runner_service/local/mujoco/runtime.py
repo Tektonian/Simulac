@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import mujoco
 
 from simulac.base.error.error import SimulacBaseError
-from simulac.base.types.geometry import Vec3
+from simulac.base.types.geometry import ColorRgb, Vec3
 from simulac.sdk.environment_service.common.model.ref import ColliderRef
 from simulac.sdk.runner_service.common.model.runtime import (
     IAmbientLightRuntimeOps,
@@ -954,13 +954,16 @@ class MujocoLightRuntimeOps(
 
     def _write_light_rgb(
         self,
-        color: tuple[float, float, float],
+        color: ColorRgb,
         intensity: float,
     ) -> None:
+        if any(channel < 0 or channel > 255 for channel in color):
+            raise SimulacBaseError("light color must be in 0..255 RGB range")
+
         rgb = (
-            float(color[0]) * float(intensity),
-            float(color[1]) * float(intensity),
-            float(color[2]) * float(intensity),
+            float(color[0]) / 255.0 * float(intensity),
+            float(color[1]) / 255.0 * float(intensity),
+            float(color[2]) / 255.0 * float(intensity),
         )
 
         if self._entity.spec.type == "ambient":
@@ -1007,16 +1010,16 @@ class MujocoLightRuntimeOps(
         )
         mujoco.mj_forward(self._model, self._data)
 
-    def get_color(self) -> tuple[float, float, float]:
+    def get_color(self) -> ColorRgb:
         rgb = self._light_rgb()
         intensity = max(rgb[0], rgb[1], rgb[2], 1e-9)
         return (
-            rgb[0] / intensity,
-            rgb[1] / intensity,
-            rgb[2] / intensity,
+            int(round(rgb[0] / intensity * 255.0)),
+            int(round(rgb[1] / intensity * 255.0)),
+            int(round(rgb[2] / intensity * 255.0)),
         )
 
-    def change_color(self, color: tuple[float, float, float]) -> None:
+    def change_color(self, color: ColorRgb) -> None:
         self._write_light_rgb(color, self.get_intensity())
         mujoco.mj_forward(self._model, self._data)
 
