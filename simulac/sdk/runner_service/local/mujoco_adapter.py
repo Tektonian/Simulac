@@ -14,6 +14,7 @@ from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
     MujocoGeomBinding,
     MujocoJointBinding,
+    MujocoLightBinding,
     MujocoLinkBinding,
     MujocoRobotBinding,
     MujocoSensorBinding,
@@ -28,9 +29,14 @@ if TYPE_CHECKING:
         IEnvironmentManagementService,
     )
     from simulac.sdk.environment_service.common.model.entity import (
+        AmbientLightSpec,
+        AreaLightSpec,
         EnvironmentCameraEntity,
+        EnvironmentLightEntity,
         EnvironmentMachineEntity,
         EnvironmentStuffEntity,
+        PointLightSpec,
+        SpotLightSpec,
     )
     from simulac.sdk.log_service.common.log_service import ILogService
     from simulac.sdk.runner_service.common.runner import IRunner
@@ -120,7 +126,7 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         self._stuff_bindings: dict[str, MujocoStuffBinding] = {}
         self._machine_bindings: dict[str, MujocoRobotBinding] = {}
         self._camera_bindings: dict[str, MujocoCameraBinding] = {}
-
+        self._light_bindings: dict[str, MujocoLightBinding] = {}
         env_ret = self.EnvironmentManagementService.get_environment(self.env_id)
 
         if env_ret[0] is None:
@@ -132,12 +138,15 @@ class MujocoAdapter(IPhysicsEngineAdapter):
         self._stuff_entities = {e.id: e for e in env.stuffs if e.id is not None}
         self._machine_entities = {e.id: e for e in env.machines if e.id is not None}
         self._camera_entities = {e.id: e for e in env.cameras if e.id is not None}
+        self._light_entities = {e.id: e for e in env.lights if e.id is not None}
         for stuff in env.stuffs:
             self.__add_stuff(stuff)
         for machine in env.machines:
             self.__add_machine(machine)
         for camera in env.cameras:
             self.__add_camera(camera)
+        for light in env.lights:
+            self.__add_light(light)
         """
         TODO: @gangjeuk
             1. implement mujoco parallel
@@ -155,6 +164,8 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             )
         for camera in env.cameras:
             self._camera_bindings[camera.id] = self.__build_camera_binding(camera.id)
+        for light in env.lights:
+            self._light_bindings[light.id] = self.__build_light_binding(light.id)
 
     def create_runner(self) -> IRunner:
         if self._step_count != 0:
@@ -179,9 +190,11 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             stuff_entities=self._stuff_entities,
             camera_entities=self._camera_entities,
             machine_entities=self._machine_entities,
+            light_entities=self._light_entities,
             stuff_bindings=self._stuff_bindings,
             machine_bindings=self._machine_bindings,
             camera_bindins=self._camera_bindings,
+            light_bindings=self._light_bindings,
             on_after_call_step=on_after_runner_step,
         )
 
@@ -354,6 +367,90 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             quat=(1.0, 0.0, 0.0, 0.0),
             fovy=float(camera.spec.fov),
         )
+
+    def __add_light(self, light: EnvironmentLightEntity) -> None:
+        if light.id is None:
+            raise SimulacBaseError("Light entity id is required")
+
+        body = self.root_spec.worldbody.add_body(
+            name=f"{light.id}/__root__",
+            pos=(0.0, 0.0, 0.0),
+        )
+
+        spec = light.spec
+        rgb = self.__light_rgb(spec.color)
+        diffuse, ambient, specular = self.__mujoco_light_colors(spec)
+
+        mj_light = body.add_light(
+            name=f"{light.id}/__root__",
+            pos=(0.0, 0.0, 0.0),
+            dir=(0.0, 0.0, -1.0),
+            active=bool(spec.enabled),
+            diffuse=diffuse,
+            ambient=ambient,
+            specular=specular,
+        )
+
+        if spec.type == "ambient":
+            # Mocking ambient light
+            mj_light.type = mujoco.mjtLightType.mjLIGHT_POINT
+            mj_light.diffuse = (0.0, 0.0, 0.0)
+            mj_light.specular = (0.0, 0.0, 0.0)
+            mj_light.ambient = tuple(rgb[i] * float(spec.intensity) for i in range(3))
+
+        elif spec.type == "pointlight":
+            mj_light.type = mujoco.mjtLightType.mjLIGHT_POINT
+            if spec.range is not None:
+                mj_light.range = float(spec.range)
+            mj_light.attenuation = self.__mujoco_attenuation(spec.decay)
+
+        elif spec.type == "spot":
+            mj_light.type = mujoco.mjtLightType.mjLIGHT_SPOT
+            mj_light.cutoff = float(spec.angle)
+            mj_light.exponent = max(float(spec.penumbra), 0.0)
+            if spec.range is not None:
+                mj_light.range = float(spec.range)
+            mj_light.attenuation = self.__mujoco_attenuation(spec.decay)
+
+        elif spec.type == "area":
+            # MuJoCo has no rectangular area light.
+            # Approximate with point light + bulb radius.
+            mj_light.type = mujoco.mjtLightType.mjLIGHT_POINT
+            mj_light.bulbradius = max(float(spec.width), float(spec.height)) * 0.5
+
+        else:
+            raise SimulacBaseError(f"Unsupported light type: {spec.type!r}")
+
+    def __light_rgb(self, color: tuple[int, int, int]) -> tuple[float, float, float]:
+        return (
+            float(color[0]) / 255.0,
+            float(color[1]) / 255.0,
+            float(color[2]) / 255.0,
+        )
+
+    def __mujoco_light_colors(
+        self,
+        spec: AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSpec,
+    ) -> tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ]:
+        rgb = self.__light_rgb(spec.color)
+        intensity = float(spec.intensity)
+
+        diffuse = tuple(channel * intensity for channel in rgb)
+        ambient = (0.0, 0.0, 0.0)
+        specular = tuple(channel * intensity * 0.3 for channel in rgb)
+
+        return diffuse, ambient, specular
+
+    def __mujoco_attenuation(self, decay: float) -> tuple[float, float, float]:
+        if decay <= 0.0:
+            return (1.0, 0.0, 0.0)
+        if decay <= 1.0:
+            return (0.0, 1.0, 0.0)
+        return (0.0, 0.0, 1.0)
 
     def __actuator_target(
         self,
@@ -664,6 +761,41 @@ class MujocoAdapter(IPhysicsEngineAdapter):
             camera_id=camera_id,
             camera_name="__root__camera",
             camera_full_name=camera_full_name,
+            mocap_id=int(self.model.body_mocapid[root_body_id]),
+        )
+
+    def __build_light_binding(self, entity_id: str) -> MujocoLightBinding:
+        if self.model is None:
+            raise SimulacBaseError("Adapter not initialized")
+
+        root_body_full_name = f"{entity_id}/__root__"
+        light_full_name = f"{entity_id}/__root__"
+
+        root_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            root_body_full_name,
+        )
+        if root_body_id < 0:
+            raise SimulacBaseError(f"No MuJoCo light root body for {entity_id!r}")
+
+        light_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_LIGHT,
+            light_full_name,
+        )
+        if light_id < 0:
+            raise SimulacBaseError(f"No MuJoCo light for {entity_id!r}")
+
+        return MujocoLightBinding(
+            entity_id=entity_id,
+            root_body_id=root_body_id,
+            root_body_name="__root__",
+            root_body_full_name=root_body_full_name,
+            light_id=light_id,
+            light_name="__root__",
+            light_full_name=light_full_name,
+            light_type=self._light_entities[entity_id].spec.type,
             mocap_id=int(self.model.body_mocapid[root_body_id]),
         )
 

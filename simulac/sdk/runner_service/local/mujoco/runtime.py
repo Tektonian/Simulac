@@ -10,9 +10,11 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.base.types.geometry import Vec3
 from simulac.sdk.environment_service.common.model.ref import ColliderRef
 from simulac.sdk.runner_service.common.model.runtime import (
+    IAmbientLightRuntimeOps,
+    IAreaLightRuntimeOps,
     ICameraRuntimeOps,
-    ILightRuntimeOps,
     IRobotRuntimeOps,
+    ISpotLightRuntimeOps,
     IStuffRuntimeOps,
 )
 
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
     )
     from simulac.sdk.runner_service.local.mujoco.binding import (
         MujocoCameraBinding,
+        MujocoLightBinding,
         MujocoRobotBinding,
         MujocoStuffBinding,
     )
@@ -922,15 +925,183 @@ class MujocoCameraRuntimeOps(ICameraRuntimeOps):
     #     )
 
 
-class MujocoLightRuntimeOps(ICameraRuntimeOps):
-    def get_pos(self) -> tuple[float, float, float]: ...
-    def get_quat(self) -> tuple[float, float, float, float]: ...
+class MujocoLightRuntimeOps(
+    IAmbientLightRuntimeOps,
+    ISpotLightRuntimeOps,
+    IAreaLightRuntimeOps,
+):
+    def __init__(
+        self,
+        entity_id: str,
+        model: mujoco.MjModel,
+        data: mujoco.MjData,
+        binding: MujocoLightBinding,
+        entity: EnvironmentLightEntity,
+    ) -> None:
+        self.id = entity_id
+        self._model = model
+        self._data = data
+        self._binding = binding
+        self._entity = entity
 
-    def change_pos(self, pos: tuple[float, float, float]) -> None: ...
-    def change_quat(self, quat: tuple[float, float, float, float]) -> None: ...
+    def _light_rgb(self) -> tuple[float, float, float]:
+        if self._entity.spec.type == "ambient":
+            rgb = self._model.light_ambient[self._binding.light_id]
+        else:
+            rgb = self._model.light_diffuse[self._binding.light_id]
 
-    def get_color(self) -> tuple[float, float, float]: ...
-    def change_color(self, color: tuple[float, float, float]) -> None: ...
+        return (float(rgb[0]), float(rgb[1]), float(rgb[2]))
 
-    def get_intensity(self) -> float: ...
-    def change_intensity(self, intensity: float) -> None: ...
+    def _write_light_rgb(
+        self,
+        color: tuple[float, float, float],
+        intensity: float,
+    ) -> None:
+        rgb = (
+            float(color[0]) * float(intensity),
+            float(color[1]) * float(intensity),
+            float(color[2]) * float(intensity),
+        )
+
+        if self._entity.spec.type == "ambient":
+            self._model.light_ambient[self._binding.light_id] = rgb
+            self._model.light_diffuse[self._binding.light_id] = (0.0, 0.0, 0.0)
+            self._model.light_specular[self._binding.light_id] = (0.0, 0.0, 0.0)
+            return
+
+        self._model.light_ambient[self._binding.light_id] = (0.0, 0.0, 0.0)
+        self._model.light_diffuse[self._binding.light_id] = rgb
+        self._model.light_specular[self._binding.light_id] = (
+            rgb[0] * 0.3,
+            rgb[1] * 0.3,
+            rgb[2] * 0.3,
+        )
+
+    def get_pos(self) -> tuple[float, float, float]:
+        pos = self._data.light_xpos[self._binding.light_id]
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
+    def get_quat(self) -> tuple[float, float, float, float]:
+        quat_wxyz = self._data.xquat[self._binding.root_body_id]
+        return (
+            float(quat_wxyz[1]),
+            float(quat_wxyz[2]),
+            float(quat_wxyz[3]),
+            float(quat_wxyz[0]),
+        )
+
+    def change_pos(self, pos: tuple[float, float, float]) -> None:
+        self._model.body_pos[self._binding.root_body_id] = (
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        )
+        mujoco.mj_forward(self._model, self._data)
+
+    def change_quat(self, quat: tuple[float, float, float, float]) -> None:
+        self._model.body_quat[self._binding.root_body_id] = (
+            float(quat[3]),
+            float(quat[0]),
+            float(quat[1]),
+            float(quat[2]),
+        )
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_color(self) -> tuple[float, float, float]:
+        rgb = self._light_rgb()
+        intensity = max(rgb[0], rgb[1], rgb[2], 1e-9)
+        return (
+            rgb[0] / intensity,
+            rgb[1] / intensity,
+            rgb[2] / intensity,
+        )
+
+    def change_color(self, color: tuple[float, float, float]) -> None:
+        self._write_light_rgb(color, self.get_intensity())
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_intensity(self) -> float:
+        rgb = self._light_rgb()
+        return max(rgb[0], rgb[1], rgb[2])
+
+    def change_intensity(self, intensity: float) -> None:
+        if intensity < 0:
+            raise SimulacBaseError("light intensity must be non-negative")
+
+        self._write_light_rgb(self.get_color(), float(intensity))
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_range(self) -> float:
+        return float(self._model.light_range[self._binding.light_id])
+
+    def change_range(self, range: float) -> None:
+        if range < 0:
+            raise SimulacBaseError("light range must be non-negative")
+
+        self._model.light_range[self._binding.light_id] = float(range)
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_decay(self) -> float:
+        attenuation = self._model.light_attenuation[self._binding.light_id]
+        if float(attenuation[0]) > 0.0:
+            return 0.0
+        if float(attenuation[1]) > 0.0:
+            return 1.0
+        return 2.0
+
+    def change_decay(self, decay: float) -> None:
+        if decay < 0:
+            raise SimulacBaseError("light decay must be non-negative")
+
+        if decay <= 0.0:
+            attenuation = (1.0, 0.0, 0.0)
+        elif decay <= 1.0:
+            attenuation = (0.0, 1.0, 0.0)
+        else:
+            attenuation = (0.0, 0.0, 1.0)
+
+        self._model.light_attenuation[self._binding.light_id] = attenuation
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_angle(self) -> float:
+        return float(self._model.light_cutoff[self._binding.light_id])
+
+    def change_angle(self, angle: float) -> None:
+        if angle <= 0:
+            raise SimulacBaseError("light angle must be positive")
+
+        self._model.light_cutoff[self._binding.light_id] = float(angle)
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_penumbra(self) -> float:
+        return float(self._model.light_exponent[self._binding.light_id])
+
+    def change_penumbra(self, penumbra: float) -> None:
+        if penumbra < 0:
+            raise SimulacBaseError("light penumbra must be non-negative")
+
+        self._model.light_exponent[self._binding.light_id] = float(penumbra)
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_direction(self) -> tuple[float, float, float]:
+        direction = self._data.light_xdir[self._binding.light_id]
+        return (float(direction[0]), float(direction[1]), float(direction[2]))
+
+    def change_direction(self, direction: tuple[float, float, float]) -> None:
+        self._model.light_dir[self._binding.light_id] = (
+            float(direction[0]),
+            float(direction[1]),
+            float(direction[2]),
+        )
+        mujoco.mj_forward(self._model, self._data)
+
+    def get_area_size(self) -> tuple[float, float]:
+        radius = float(self._model.light_bulbradius[self._binding.light_id])
+        return (radius * 2.0, radius * 2.0)
+
+    def change_area_size(self, width: float, height: float) -> None:
+        if width <= 0 or height <= 0:
+            raise SimulacBaseError("light area size must be positive")
+
+        self._model.light_bulbradius[self._binding.light_id] = max(width, height) * 0.5
+        mujoco.mj_forward(self._model, self._data)
