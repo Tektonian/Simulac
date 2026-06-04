@@ -136,8 +136,6 @@ class Randomize:
     def uniform(
         min: ValueT,
         max: ValueT,
-        *,
-        constraints: Sequence[RandomConstraint] = (),
     ) -> UniformRandomSpec[ValueT]:
         """Create a uniformly sampled spec between `min` and `max`.
 
@@ -150,8 +148,6 @@ class Randomize:
             "min": min,
             "max": max,
         }
-        if constraints:
-            spec["constraints"] = list(constraints)
         return spec
 
     @staticmethod
@@ -161,7 +157,6 @@ class Randomize:
         *,
         clip_min: ValueT | None = None,
         clip_max: ValueT | None = None,
-        constraints: Sequence[RandomConstraint] = (),
     ) -> NormalRandomSpec[ValueT]:
         """Create a normal-distribution spec around `mean`.
 
@@ -178,14 +173,11 @@ class Randomize:
             spec["clip_min"] = clip_min
         if clip_max is not None:
             spec["clip_max"] = clip_max
-        if constraints:
-            spec["constraints"] = list(constraints)
         return spec
 
     @staticmethod
     def choice(
         *values: ValueT,
-        constraints: Sequence[RandomConstraint] = (),
     ) -> ChoiceRandomSpec[ValueT]:
         """Create a discrete choice spec.
 
@@ -197,6 +189,4 @@ class Randomize:
             "type": "choice",
             "values": list(values),
         }
-        if constraints:
-            spec["constraints"] = list(constraints)
         return spec
