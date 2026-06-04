@@ -659,20 +659,20 @@ class MujocoRunner(IRunner):
         # https://github.com/google-deepmind/mujoco/blob/5ee8bd7b9c3147f1094816882903e741e53c26bf/src/engine/engine_util_spatial.c#L66
         ax, ay, az, aw = parent_quat
         bx, by, bz, bw = local_quat
-        camera_quat: Quat = (
+        entity_quat: Quat = (
             aw * bx + ax * bw + ay * bz - az * by,
             aw * by - ax * bz + ay * bw + az * bx,
             aw * bz + ax * by - ay * bx + az * bw,
             aw * bw - ax * bx - ay * by - az * bz,
         )
 
-        camera_pos: Vec3 = (
+        entity_pos: Vec3 = (
             parent_pos[0] + offset_world[0],
             parent_pos[1] + offset_world[1],
             parent_pos[2] + offset_world[2],
         )
 
-        apply_pose_func(binding, camera_pos, camera_quat)
+        apply_pose_func(binding, entity_pos, entity_quat)
 
     def _apply_machine_joint_pos(
         self,
@@ -732,19 +732,19 @@ class MujocoRunner(IRunner):
         offset: Vec3 = sampler.sample(op.offset)
 
         current_pos = self._require_data().xpos[binding.root_body_id]
-        camera_pos = (
+        entity_pos = (
             float(current_pos[0]) + float(offset[0]),
             float(current_pos[1]) + float(offset[1]),
             float(current_pos[2]) + float(offset[2]),
         )
 
-        quat = self._look_at_quat(
-            eye=camera_pos,
+        entity_quat = self._look_at_quat(
+            eye=entity_pos,
             target=(float(target[0]), float(target[1]), float(target[2])),
             up=sampler.sample(op.up),
         )
 
-        apply_pose_func(binding, camera_pos, quat)
+        apply_pose_func(binding, entity_pos, entity_quat)
 
     def _apply_follow_op(self, op: FollowOp, resolver: MujocoRefResolver) -> None:
         entity_id = op.entity.entity_id
