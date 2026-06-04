@@ -368,7 +368,6 @@ class EnvironmentManagementService(IEnvironmentManagementService):
             ref_model.SetCameraFarOp,
             ref_model.SetLightPosOp,
             ref_model.SetLightRotOp,
-            ref_model.SetLightTypeOp,
             ref_model.SetLightIntensityOp,
             ref_model.SetLightColorOp,
             ref_model.SetLightAngleOp,
