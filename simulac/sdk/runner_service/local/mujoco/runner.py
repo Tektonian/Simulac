@@ -28,6 +28,15 @@ from simulac.sdk.environment_service.common.model.ref import (
     SetJointDampingOp,
     SetJointFrictionOp,
     SetJointPosOp,
+    SetLightAngleOp,
+    SetLightAreaSizeOp,
+    SetLightColorOp,
+    SetLightDecayOp,
+    SetLightIntensityOp,
+    SetLightPenumbraOp,
+    SetLightPosOp,
+    SetLightRangeOp,
+    SetLightRotOp,
     SurfaceSampleRef,
 )
 from simulac.sdk.environment_service.common.randomize import (
@@ -609,10 +618,19 @@ class MujocoRunner(IRunner):
     ) -> None:
         entity_id = op.entity.entity_id
 
-        if entity_id not in self._camera_bindings:
-            raise SimulacBaseError("AttachOp currently supports camera entities first")
+        if entity_id in self._camera_bindings:
+            binding = self._camera_bindings[entity_id]
+            apply_pose_func = self._apply_camera_pose
+        elif entity_id in self._light_bindings:
+            binding = self._light_bindings[entity_id]
+            apply_pose_func = self._apply_light_pose
+        else:
+            raise SimulacBaseError(
+                "AttachOp currently supports camera and light entities"
+            )
 
-        binding = self._camera_bindings[entity_id]
+        if binding.root_body_id is None:
+            raise SimulacBaseError(f"Entity {entity_id!r} has no attachable root body")
 
         parent_pos, parent_quat = resolver.resolve_frame(op.parent)
 
@@ -654,7 +672,7 @@ class MujocoRunner(IRunner):
             parent_pos[2] + offset_world[2],
         )
 
-        self._apply_camera_pose(binding, camera_pos, camera_quat)
+        apply_pose_func(binding, camera_pos, camera_quat)
 
     def _apply_machine_joint_pos(
         self,
@@ -696,10 +714,19 @@ class MujocoRunner(IRunner):
     ) -> None:
         entity_id = op.entity.entity_id
 
-        if entity_id not in self._camera_bindings:
-            raise SimulacBaseError("LookAtOp currently supports camera entities")
+        if entity_id in self._camera_bindings:
+            binding = self._camera_bindings[entity_id]
+            apply_pose_func = self._apply_camera_pose
+        elif entity_id in self._light_bindings:
+            binding = self._light_bindings[entity_id]
+            apply_pose_func = self._apply_light_pose
+        else:
+            raise SimulacBaseError(
+                "LookAtOp currently supports camera and light entities"
+            )
 
-        binding = self._camera_bindings[entity_id]
+        if binding.root_body_id is None:
+            raise SimulacBaseError(f"Entity {entity_id!r} has no look-at root body")
 
         target = resolver.resolve_point(sampler.sample(op.target))
         offset: Vec3 = sampler.sample(op.offset)
@@ -717,7 +744,7 @@ class MujocoRunner(IRunner):
             up=sampler.sample(op.up),
         )
 
-        self._apply_camera_pose(binding, camera_pos, quat)
+        apply_pose_func(binding, camera_pos, quat)
 
     def _apply_follow_op(self, op: FollowOp, resolver: MujocoRefResolver) -> None:
         entity_id = op.entity.entity_id
@@ -905,6 +932,69 @@ class MujocoRunner(IRunner):
                 float(quat[1]),
                 float(quat[2]),
             )
+
+    def _light_binding_entity(
+        self,
+        entity_id: str,
+    ) -> tuple[MujocoLightBinding, EnvironmentLightEntity]:
+        binding = self._light_bindings.get(entity_id)
+        entity = self._light_entities.get(entity_id)
+
+        if binding is None or entity is None:
+            raise SimulacBaseError(f"No MuJoCo light binding for entity {entity_id!r}")
+
+        return binding, entity
+
+    def _read_light_color_intensity(
+        self,
+        light_id: int,
+        spec: AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSpec,
+    ) -> tuple[tuple[int, int, int], float]:
+        if isinstance(spec, AmbientLightSpec):
+            rgb = self.mj_model.light_ambient[light_id]
+        else:
+            rgb = self.mj_model.light_diffuse[light_id]
+
+        intensity = max(float(rgb[0]), float(rgb[1]), float(rgb[2]))
+
+        if intensity <= 1e-9:
+            return (0, 0, 0), 0.0
+
+        return (
+            int(round(float(rgb[0]) / intensity * 255.0)),
+            int(round(float(rgb[1]) / intensity * 255.0)),
+            int(round(float(rgb[2]) / intensity * 255.0)),
+        ), intensity
+
+    def _write_light_color_intensity(
+        self,
+        light_id: int,
+        spec: AmbientLightSpec | PointLightSpec | SpotLightSpec | AreaLightSpec,
+        *,
+        color: tuple[int, int, int],
+        intensity: float,
+    ) -> None:
+        rgb = (
+            float(color[0]) / 255.0,
+            float(color[1]) / 255.0,
+            float(color[2]) / 255.0,
+        )
+
+        if isinstance(spec, AmbientLightSpec):
+            self.mj_model.light_diffuse[light_id] = (0.0, 0.0, 0.0)
+            self.mj_model.light_specular[light_id] = (0.0, 0.0, 0.0)
+            self.mj_model.light_ambient[light_id] = tuple(
+                channel * intensity for channel in rgb
+            )
+            return
+
+        self.mj_model.light_diffuse[light_id] = tuple(
+            channel * intensity for channel in rgb
+        )
+        self.mj_model.light_ambient[light_id] = (0.0, 0.0, 0.0)
+        self.mj_model.light_specular[light_id] = tuple(
+            channel * intensity * 0.3 for channel in rgb
+        )
 
     def _apply_light_properties(
         self,
@@ -1169,6 +1259,134 @@ class MujocoRunner(IRunner):
             self.mj_model.dof_damping[dadr : dadr + qvel_dim] = [damping] * qvel_dim
             return
 
+        # region - Light operation
+        if isinstance(op, SetLightPosOp):
+            binding, _ = self._light_binding_entity(op.light.entity_id)
+
+            pos_value = sampler.sample(op.pos)
+            if isinstance(pos_value, PointRefBase):
+                pos = resolver.resolve_point(pos_value)
+            else:
+                pos = pos_value
+
+            self._apply_light_pose(binding, pos, None)
+            return
+
+        if isinstance(op, SetLightRotOp):
+            binding, _ = self._light_binding_entity(op.light.entity_id)
+            rot = sampler.sample(op.rot)
+            quat = euler_to_quat(float(rot[0]), float(rot[1]), float(rot[2]))
+            self._apply_light_pose(binding, None, quat)
+            return
+
+        if isinstance(op, SetLightIntensityOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            color, _ = self._read_light_color_intensity(
+                binding.light_id,
+                entity.spec,
+            )
+            intensity = float(sampler.sample(op.intensity))
+
+            if intensity < 0:
+                raise SimulacBaseError("light intensity must be non-negative")
+
+            self._write_light_color_intensity(
+                binding.light_id,
+                entity.spec,
+                color=color,
+                intensity=intensity,
+            )
+            return
+
+        if isinstance(op, SetLightColorOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            _, intensity = self._read_light_color_intensity(
+                binding.light_id,
+                entity.spec,
+            )
+            color = sampler.sample(op.color)
+
+            self._write_light_color_intensity(
+                binding.light_id,
+                entity.spec,
+                color=color,
+                intensity=intensity,
+            )
+            return
+
+        if isinstance(op, SetLightAngleOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            if not isinstance(entity.spec, SpotLightSpec):
+                raise SimulacBaseError("SetLightAngleOp only supports spot lights")
+
+            angle = float(sampler.sample(op.angle))
+            if angle <= 0:
+                raise SimulacBaseError("light angle must be positive")
+
+            self.mj_model.light_cutoff[binding.light_id] = angle
+            return
+
+        if isinstance(op, SetLightAreaSizeOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            if not isinstance(entity.spec, AreaLightSpec):
+                raise SimulacBaseError("SetLightAreaSizeOp only supports area lights")
+
+            width = float(sampler.sample(op.width))
+            height = float(sampler.sample(op.height))
+            if width <= 0 or height <= 0:
+                raise SimulacBaseError("light area size must be positive")
+
+            self.mj_model.light_bulbradius[binding.light_id] = max(width, height) * 0.5
+            return
+
+        if isinstance(op, SetLightRangeOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            if not isinstance(entity.spec, (PointLightSpec, SpotLightSpec)):
+                raise SimulacBaseError(
+                    "SetLightRangeOp only supports point and spot lights"
+                )
+
+            light_range = float(sampler.sample(op.range))
+            if light_range < 0:
+                raise SimulacBaseError("light range must be non-negative")
+
+            self.mj_model.light_range[binding.light_id] = light_range
+            return
+
+        if isinstance(op, SetLightDecayOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            if not isinstance(entity.spec, (PointLightSpec, SpotLightSpec)):
+                raise SimulacBaseError(
+                    "SetLightDecayOp only supports point and spot lights"
+                )
+
+            decay = float(sampler.sample(op.decay))
+            if decay < 0:
+                raise SimulacBaseError("light decay must be non-negative")
+
+            if decay <= 0.0:
+                self.mj_model.light_attenuation[binding.light_id] = (1.0, 0.0, 0.0)
+            elif decay <= 1.0:
+                self.mj_model.light_attenuation[binding.light_id] = (0.0, 1.0, 0.0)
+            else:
+                self.mj_model.light_attenuation[binding.light_id] = (0.0, 0.0, 1.0)
+
+            return
+
+        if isinstance(op, SetLightPenumbraOp):
+            binding, entity = self._light_binding_entity(op.light.entity_id)
+            if not isinstance(entity.spec, SpotLightSpec):
+                raise SimulacBaseError("SetLightPenumbraOp only supports spot lights")
+
+            penumbra = float(sampler.sample(op.penumbra))
+            if penumbra < 0:
+                raise SimulacBaseError("light penumbra must be non-negative")
+
+            self.mj_model.light_exponent[binding.light_id] = penumbra
+            return
+        # end-region
+
+        # region - attachment operations
         if isinstance(op, AttachOp):
             self._apply_attach_op(op, resolver, sampler)
             return
@@ -1181,7 +1399,7 @@ class MujocoRunner(IRunner):
             self._follow_ops.append(op)
             self._apply_follow_op(op, resolver=resolver)
             return
-
+        # end-region
         raise SimulacBaseError(f"Unsupported build op: {type(op).__name__}")
 
     def _named_id(
