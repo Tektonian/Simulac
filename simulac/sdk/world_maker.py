@@ -21,6 +21,7 @@ from simulac.sdk.log_service.common.log_service import ILogService
 from simulac.sdk.runner_service.common.runner_service import (
     IRunnerManagementService,
 )
+from simulac.sdk.telemetry_service.common.telemetry_service import ITelemetryService
 
 if TYPE_CHECKING:
     from simulac.sdk.environment_service.common.environment import IEnvironment
@@ -52,12 +53,14 @@ class WorldMakerFacade:
         EnvironmentManagementService: IEnvironmentManagementService,
         EnvironmentBuildService: IEnvironmentBuildService,
         AssetService: IAssetService,
+        TelemetryService: ITelemetryService,
     ):
         self.LogService = LogService
         self.RunnerManagementService = RunnerManagementService
         self.EnvironmentManagementService = EnvironmentManagementService
         self.EnvironmentBuildService = EnvironmentBuildService
         self.AssetService = AssetService
+        self.TelemetryService = TelemetryService
 
     def create_environment(
         self,
@@ -70,13 +73,27 @@ class WorldMakerFacade:
                 raise SimulacBaseError(
                     f"Unsupported environment source: {env_uri_or_prebuilt_id}"
                 )
-            return self.EnvironmentManagementService.load_env(source)
+            env = self.EnvironmentManagementService.load_env(source)
+            self.TelemetryService.public_log(
+                "simulac_environment_loaded",
+                {
+                    "env_id": env.id,
+                    "default_engine": default_engine,
+                    "source_type": "local_file",
+                },
+            )
+            return env
 
         env_ret = self.EnvironmentManagementService.create_environment(default_engine)
-
         if env_ret[0] is None:
             raise env_ret[1]
-
+        self.TelemetryService.public_log(
+            "simulac_environment_created",
+            {
+                "env_id": env_ret[0].id,
+                "default_engine": default_engine,
+            },
+        )
         return env_ret[0]
 
     def create_stuff_entity(

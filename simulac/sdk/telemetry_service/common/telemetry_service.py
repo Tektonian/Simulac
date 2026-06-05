@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import atexit
 import json
+import platform
 import time
+import importlib.metadata
 from abc import abstractmethod
 from datetime import datetime, timezone
 from queue import Empty, Full, Queue
@@ -219,7 +221,12 @@ class TelemetryService(ITelemetryService):
 
         for event in events:
             self._send_event(event)
-
+    def __sdk_version(self) -> str:
+        try:
+            return importlib.metadata.version("simulac")
+        except importlib.metadata.PackageNotFoundError:
+            return "unknown"
+        
     def _send_event(self, event: dict[str, object]) -> None:
         token = self.EnvvarService.token
         url = urljoin(
@@ -228,10 +235,20 @@ class TelemetryService(ITelemetryService):
 
         payload = {
             "sdk": "simulac-python",
+            "sdk_version": self.__sdk_version(),
+            "python_version": platform.python_version(),
+            "platform": platform.system().lower(),
+            "platform_release": platform.release(),
+            "architecture": platform.machine(),
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "data": event,
-            "api_key": token,
         }
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if token is not None:
+            headers["tt-apikey"] = token
 
         attempt_count = 2 if self._shutdown_event.is_set() else 1
 
@@ -239,7 +256,7 @@ class TelemetryService(ITelemetryService):
             request = Request(
                 url=url,
                 data=json.dumps(payload, default=str).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 method="POST",
             )
 

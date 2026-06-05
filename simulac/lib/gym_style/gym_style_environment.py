@@ -208,7 +208,15 @@ class BenchmarkEnvironment:
                         data={
                             "err": err.args,
                             "benchmark": self.benchmark_id,
-                            "stacktrace": traceback.format_exc(),
+                            "benchmark_id": self.benchmark_id,
+                            "owner_id": self.owner_id,
+                            "world_id": self.world_id,
+                            "env_id": self.env_id,
+                            "runner_id": self.runner_id,
+                            "attempt": attempt,
+                            "max_attempts": MAX_CONNECT_RETRIES,
+                            "error_type": type(err).__name__,
+                            "error_message": str(err),
                         },
                     )
                     raise SimulacBaseError(
@@ -283,9 +291,11 @@ class BenchmarkEnvironment:
             self._runtime.telemetry.public_error(
                 event_name="simulac_step_failed",
                 data={
-                    "err": err.args,
-                    "benchmark": self.benchmark_id,
-                    "stacktrace": traceback.format_exc(),
+                    "benchmark_id": self.benchmark_id,
+                    "env_id": self.env_id,
+                    "runner_id": self.runner_id,
+                    "missing_key": str(err),
+                    "response_keys": sorted(rcvd.keys()),
                 },
             )
             raise
@@ -311,9 +321,11 @@ class BenchmarkEnvironment:
             self._runtime.telemetry.public_error(
                 event_name="simulac_reset_failed",
                 data={
-                    "err": err.args,
-                    "benchmark": self.benchmark_id,
-                    "stacktrace": traceback.format_exc(),
+                    "benchmark_id": self.benchmark_id,
+                    "env_id": self.env_id,
+                    "runner_id": self.runner_id,
+                    "missing_key": str(err),
+                    "response_keys": sorted(rcvd.keys()),
                 },
             )
             raise
