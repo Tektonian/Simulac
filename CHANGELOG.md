@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.1.0 (2026-06-07)
+
+- User side APIs are fully implemented🔥
+- Complete mujoco adapter implementation
+
+User side APIs include typed objects, randomzation, constraints, placement, runtime object access, asset/file services, import/export `Environment`, native context access, camera rendering, light APIs.
+
+~~(What a journey... It was so hard...)~~
+
+Additionally, the initial senario concept has been added.
+
+### Features
+
+* **lib:** redefine the world maker interface and add typed randomization helpers, cameras, lights, runtime objects, and parallel runner flows ([#25](https://github.com/Tektonian/Simulac/pull/25)) ([85f426a](https://github.com/Tektonian/Simulac/commit/85f426a))
+* **lib:** add articulated object reference APIs and public interfaces for `*Runtime` / `*Object` types ([#26](https://github.com/Tektonian/Simulac/pull/26)) ([7baf61e](https://github.com/Tektonian/Simulac/commit/7baf61e))
+* **sdk,lib:** add unified `add_entity()` flow for MuJoCo environments, typed environment dataclasses, and structured camera/light specs ([#27](https://github.com/Tektonian/Simulac/pull/27)) ([57a2f80](https://github.com/Tektonian/Simulac/commit/57a2f80))
+* **lib,sdk:** integrate MuJoCo environment assembly, placement, randomization, reset, tick, and step flow ([#28](https://github.com/Tektonian/Simulac/pull/28)) ([d541808](https://github.com/Tektonian/Simulac/commit/d541808))
+* **lib,sdk:** implement MuJoCo runtime object access through `Runner.get_runtime_object()` and SDK `IRunner.get_runtime_object(entity_id)` ([#31](https://github.com/Tektonian/Simulac/pull/31)) ([f1bd0bb](https://github.com/Tektonian/Simulac/commit/f1bd0bb))
+* **sdk:** integrate the MuJoCo runner runtime, bindings, reset sampling, and `StuffRuntime` operations ([#32](https://github.com/Tektonian/Simulac/pull/32)) ([e5b3159](https://github.com/Tektonian/Simulac/commit/e5b3159))
+* **sdk:** implement MuJoCo `RobotRuntime` and `CameraRuntime`, including typed runtime wrappers, camera binding, camera relations, and runtime object dispatch ([#33](https://github.com/Tektonian/Simulac/pull/33)) ([d9efb8e](https://github.com/Tektonian/Simulac/commit/d9efb8e))
+* **sdk:** add scene constraints and MuJoCo reset-time constraint checking for distance, bounding box, and non-penetration constraints ([#35](https://github.com/Tektonian/Simulac/pull/35)) ([9da1651](https://github.com/Tektonian/Simulac/commit/9da1651))
+* **sdk:** add MuJoCo placement resolver support for surface sampling with source refs, tangent offsets, and local/world offsets ([#36](https://github.com/Tektonian/Simulac/pull/36)) ([042473e](https://github.com/Tektonian/Simulac/commit/042473e))
+* **lib:** implement user-side `Environment.constraint(...)` and scene constraint helpers ([#37](https://github.com/Tektonian/Simulac/pull/37)) ([de430c2](https://github.com/Tektonian/Simulac/commit/de430c2))
+* **lib,sdk:** support the `fixed` flag for MuJoCo stuff entities and `StuffObject.set_fixed(...)` ([#39](https://github.com/Tektonian/Simulac/pull/39)) ([f04cee5](https://github.com/Tektonian/Simulac/commit/f04cee5))
+* **lib,sdk:** finalize the MuJoCo API design with runtime state returns, contact inspection, runtime robot component APIs, and `RobotRuntime.set_control(action)` ([#40](https://github.com/Tektonian/Simulac/pull/40)) ([333e94f](https://github.com/Tektonian/Simulac/commit/333e94f))
+* **sdk:** implement `IFileService` with local `file:` and remote `http:` / `https:` providers ([#41](https://github.com/Tektonian/Simulac/pull/41)) ([a5e5b09](https://github.com/Tektonian/Simulac/commit/a5e5b09))
+* **sdk:** implement `AssetService` for parsing, resolving, downloading, caching, and verifying asset bundles from native asset references such as `Stuff("Robocasa/mug/mug_01")` ([#42](https://github.com/Tektonian/Simulac/pull/42)) ([de25e40](https://github.com/Tektonian/Simulac/commit/de25e40))
+* **lib,sdk:** implement environment import and export through `load_env()`, `dump_env()`, and `dump_env_json()` on the environment management service ([#43](https://github.com/Tektonian/Simulac/pull/43)) ([c220ea2](https://github.com/Tektonian/Simulac/commit/c220ea2))
+* **lib,sdk:** add `runner.context("mujoco")` native context access for MuJoCo `mjModel`, `mjData`, and entity bindings ([#44](https://github.com/Tektonian/Simulac/pull/44)) ([269bea5](https://github.com/Tektonian/Simulac/commit/269bea5))
+* **lib,sdk:** remove the unpredictable `Stuff.set_density()` API ([#45](https://github.com/Tektonian/Simulac/pull/45)) ([98e5eb6](https://github.com/Tektonian/Simulac/commit/98e5eb6))
+* **lib,sdk:** complete build-time `StuffObject` / `RobotObject` APIs, add shared runtime joint state, and add `RobotRuntime.sensor()` / `SensorState` ([#46](https://github.com/Tektonian/Simulac/pull/46)) ([54d545b](https://github.com/Tektonian/Simulac/commit/54d545b))
+* **lib,sdk:** add `Environment.remove_object()` and update the environment JSON schema to use `asset_uri` ([#47](https://github.com/Tektonian/Simulac/pull/47)) ([37af6ef](https://github.com/Tektonian/Simulac/commit/37af6ef))
+* **lib,sdk:** add camera runtime rendering through `CameraRuntime.render(width, height)` for RGB, depth, segmentation, and typed pointcloud support ([#48](https://github.com/Tektonian/Simulac/pull/48)) ([45f157f](https://github.com/Tektonian/Simulac/commit/45f157f))
+* **lib,sdk:** implement user-side, SDK, and MuJoCo light runtime APIs for ambient, point, spot, and area lights ([#49](https://github.com/Tektonian/Simulac/pull/49)) ([cdad679](https://github.com/Tektonian/Simulac/commit/cdad679))
+* **lib:** add the initial `Scenario` concept for user-side runtime behavior control ([#50](https://github.com/Tektonian/Simulac/pull/50)) ([7683268](https://github.com/Tektonian/Simulac/commit/7683268))
+
+### Bug Fixes
+
+* **lib,sdk:** allow point refs in `add_entity(..., pos=...)` typing ([#38](https://github.com/Tektonian/Simulac/pull/38)) ([9484499](https://github.com/Tektonian/Simulac/commit/9484499))
+* **sdk:** fix `TelemetryService` typing ([8803a42](https://github.com/Tektonian/Simulac/commit/8803a42))
+
+### Documentation
+
+* **project:** add the `eval_libero_smolvla.py` evaluation example ([c481b68](https://github.com/Tektonian/Simulac/commit/c481b68))
+* **project:** update README and internal docs, including concept docs, Python rules, and architecture decision records ([2d3b94f](https://github.com/Tektonian/Simulac/commit/2d3b94f))
+
+### Chores
+
+* **lib:** remove `constraints` from `Randomization` ([316a139](https://github.com/Tektonian/Simulac/commit/316a139))
+* **lib:** implement user-side docstrings for gym-style and world-maker APIs ([be7f87b](https://github.com/Tektonian/Simulac/commit/be7f87b))
+* **lib,sdk:** add telemetry code paths to gym-style environments, asset resolution, world-maker flow, and telemetry service reporting ([bb33864](https://github.com/Tektonian/Simulac/commit/bb33864))
+
+### Breaking Changes
+
+* `Environment` entity pose inputs changed from `quat` to `rot`.
+* `Environment` constructor parameter order changed from `[default_engine, prebuilt_env]` to `[prebuilt_env, default_engine]`.
+* `Environment.place_entity()` / `Environment.place_object()` were removed in favor of `Environment.add_entity(..., pos=surface.sample(...))` and environment-level constraints.
+* `Runner.step(action)` was replaced with `RobotRuntime.set_control(action)`.
+* `Runner` now uses `tick_dt_ms` instead of the previous `tick` naming.
+* `IEnvironment.load_env()` was removed; import/export moved to the environment management service.
+* Some runtime mutation methods for size, fixed state, and density were removed from the common runtime interface.
+* `Stuff.set_density()` was removed.
+* Camera type literals were narrowed to `rgb`, `depth`, `pointcloud`, and `segmentation`.
+* `SetLightTypeOp` was removed, and light type literals were normalized to `ambient`, `pointlight`, `spot`, and `area`.
+
+### Notes
+
+* MuJoCo pointcloud camera rendering is typed but still needs implementation and dependency discussion. (I hate numpy dependency broken)
+* MuJoCo area lights are approximated with point lights plus bulb radius, and ambient lights are modeled through MuJoCo ambient light channels.
+* `AssetService` is implemented, but backend asset API details and asset curation still need follow-up work.
+* `Scenario` is concept-level in this release and is not yet wired into `Runner` execution.
+* `ParallelRunner` is exists but not implemented.
+
 ## 0.0.4 (2026-05-05)
 
 Add error recovery logic in `BenchmarkEnvironment` to prevent vectorized environments from crashing due to server-side errors.

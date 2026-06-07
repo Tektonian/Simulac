@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "simulac"
-version = "0.0.4"
+version = "0.1.0"
 description = "A CLI, library, and local server for interacting with the Tektonian backend."
 authors = [{ name = "Jeuk Kang", email = "gangjeuk@tektonian.com" }]
 keywords = [
