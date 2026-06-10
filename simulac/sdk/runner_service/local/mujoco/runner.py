@@ -347,6 +347,7 @@ class MujocoRunner(IRunner):
             stuff_bindings=self._stuff_bindings,
             machine_bindings=self._machine_bindings,
             camera_bindings=self._camera_bindings,
+            light_bindings=self._light_bindings,
         )
 
     def _sampling_candidate(self, sampler: ResetSampler) -> dict[str, dict[str, Any]]:

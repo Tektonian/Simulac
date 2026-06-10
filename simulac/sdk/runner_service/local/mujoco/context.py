@@ -9,6 +9,7 @@ from simulac.base.error.error import SimulacBaseError
 from simulac.sdk.runner_service.common.model.context import INativeContext
 from simulac.sdk.runner_service.local.mujoco.binding import (
     MujocoCameraBinding,
+    MujocoLightBinding,
     MujocoRobotBinding,
     MujocoStuffBinding,
 )
@@ -27,6 +28,7 @@ class MujocoNativeContext(INativeContext):
     stuff_bindings: dict[str, MujocoStuffBinding]
     machine_bindings: dict[str, MujocoRobotBinding]
     camera_bindings: dict[str, MujocoCameraBinding]
+    light_bindings: dict[str, MujocoLightBinding]
 
     @overload
     def binding(self, entity: LibStuffType) -> MujocoStuffBinding: ...
@@ -41,7 +43,12 @@ class MujocoNativeContext(INativeContext):
 
     def binding(
         self, entity: str | LibRobotType | LibStuffType | LibCameraType
-    ) -> MujocoStuffBinding | MujocoRobotBinding | MujocoCameraBinding:
+    ) -> (
+        MujocoStuffBinding
+        | MujocoRobotBinding
+        | MujocoCameraBinding
+        | MujocoLightBinding
+    ):
         entity_id = self.__entity_id(entity)
         binding = self.stuff_bindings.get(entity_id)
         if binding is not None:
@@ -52,6 +59,10 @@ class MujocoNativeContext(INativeContext):
             return binding
 
         binding = self.camera_bindings.get(entity_id)
+        if binding is not None:
+            return binding
+
+        binding = self.light_bindings.get(entity_id)
         if binding is not None:
             return binding
 
