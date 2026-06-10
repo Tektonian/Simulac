@@ -599,46 +599,46 @@ class FollowOp(BuildOpBase):
     keep_offset: bool = True
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraPosOp(BuildOpBase):
-    camera: CameraRef
-    pos: RandomizableVec3 | PointRefType
+# @dataclass(frozen=True, slots=True)
+# class SetCameraPosOp(BuildOpBase):
+#     camera: CameraRef
+#     pos: RandomizableVec3 | PointRefType
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraRotOp(BuildOpBase):
-    camera: CameraRef
-    rot: RandomizableVec3
+# @dataclass(frozen=True, slots=True)
+# class SetCameraRotOp(BuildOpBase):
+#     camera: CameraRef
+#     rot: RandomizableVec3
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraTypeOp(BuildOpBase):
-    camera: CameraRef
-    type: CameraType
+# @dataclass(frozen=True, slots=True)
+# class SetCameraTypeOp(BuildOpBase):
+#     camera: CameraRef
+#     type: CameraType
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraFovOp(BuildOpBase):
-    camera: CameraRef
-    fov: RandomizableFloat
+# @dataclass(frozen=True, slots=True)
+# class SetCameraFovOp(BuildOpBase):
+#     camera: CameraRef
+#     fov: RandomizableFloat
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraAspectOp(BuildOpBase):
-    camera: CameraRef
-    aspect: RandomizableFloat
+# @dataclass(frozen=True, slots=True)
+# class SetCameraAspectOp(BuildOpBase):
+#     camera: CameraRef
+#     aspect: RandomizableFloat
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraNearOp(BuildOpBase):
-    camera: CameraRef
-    near: RandomizableFloat
+# @dataclass(frozen=True, slots=True)
+# class SetCameraNearOp(BuildOpBase):
+#     camera: CameraRef
+#     near: RandomizableFloat
 
 
-@dataclass(frozen=True, slots=True)
-class SetCameraFarOp(BuildOpBase):
-    camera: CameraRef
-    far: RandomizableFloat
+# @dataclass(frozen=True, slots=True)
+# class SetCameraFarOp(BuildOpBase):
+#     camera: CameraRef
+#     far: RandomizableFloat
 
 
 # @dataclass(frozen=True, slots=True)
@@ -740,13 +740,13 @@ type BuildOpType = (
     | AttachOp
     | LookAtOp
     | FollowOp
-    | SetCameraPosOp
-    | SetCameraRotOp
-    | SetCameraTypeOp
-    | SetCameraFovOp
-    | SetCameraAspectOp
-    | SetCameraNearOp
-    | SetCameraFarOp
+    # | SetCameraPosOp
+    # | SetCameraRotOp
+    # | SetCameraTypeOp
+    # | SetCameraFovOp
+    # | SetCameraAspectOp
+    # | SetCameraNearOp
+    # | SetCameraFarOp
     # | SetCameraResolutionOp
     # | SetCameraNoiseOp
     # | SetCameraExposureOp

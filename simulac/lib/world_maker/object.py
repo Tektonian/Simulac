@@ -9,6 +9,7 @@ from simulac.sdk import obtain_runtime
 from simulac.sdk.environment_service.common.model.entity import (
     AmbientLightSpec,
     AreaLightSpec,
+    CameraSpec,
     PointLightSpec,
     SpotLightSpec,
 )
@@ -23,9 +24,9 @@ from simulac.sdk.environment_service.common.model.ref import (
     LightRef,
     LookAtOp,
     PlaceOp,
-    SetCameraFovOp,
-    SetCameraPosOp,
-    SetCameraRotOp,
+    # SetCameraFovOp,
+    # SetCameraPosOp,
+    # SetCameraRotOp,
     WorldPointRef,
     as_place_source,
     as_place_target,
@@ -157,8 +158,8 @@ class Environment:
     def add_entity(
         self,
         entity: Camera[TCameraType],
-        pos: RandomizableVec3 | PointRefType = (0, 0, 0),
-        rot: RandomizableVec3 = (0, 0, 0),
+        pos: Vec3 | PointRefType = (0, 0, 0),
+        rot: Vec3 = (0, 0, 0),
         entity_id: str | None = None,
         description: str | None = None,
         *,
@@ -696,8 +697,8 @@ class RobotObject(Generic[ActionT]):
 class CameraObject(Generic[TCameraType]):
     """Build-time handle for a camera entity.
 
-    Camera placement and behavior are stored as build-time relation ops so refs
-    and randomization can be resolved consistently at reset time.
+    CameraObject mutates the scene definition before Runner creation. Runtime
+    camera changes must be made through the matching CameraRuntime handle.
     """
 
     def __init__(
@@ -713,27 +714,35 @@ class CameraObject(Generic[TCameraType]):
         self._entity = entity
         self._env = env
 
-    def set_pos(self, pos: RandomizableVec3) -> None:
+    def set_pos(self, pos: Vec3) -> None:
         """Set build-time camera position."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        self._env.relations.append(SetCameraPosOp(CameraRef(self._entity.id), pos))
+        self._entity.pos = pos
 
-    def set_rot(self, rot: RandomizableVec3) -> None:
+    def set_rot(self, rot: Vec3) -> None:
         """Set build-time camera Euler rotation."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        self._env.relations.append(SetCameraRotOp(CameraRef(self._entity.id), rot))
+        self._entity.rot = rot
 
-    def set_fov(self, fov: RandomizableFloat) -> None:
+    def set_fov(self, fov: float) -> None:
         """Set build-time camera field of view."""
         if self._entity.id is None:
             raise SimulacBaseError("Entity must be added to Environment first")
-        self._env.relations.append(SetCameraFovOp(CameraRef(self._entity.id), fov))
+        self._entity.spec = CameraSpec(
+            type=self._entity.spec.type,
+            mode=self._entity.spec.mode,
+            lookat=self._entity.spec.lookat,
+            fov=fov,
+            aspect=self._entity.spec.aspect,
+            near=self._entity.spec.near,
+            far=self._entity.spec.far,
+        )
 
-    def _set_aspect(self, aspect: RandomizableFloat) -> None: ...
-    def _set_near(self, near: RandomizableFloat) -> None: ...
-    def _set_far(self, far: RandomizableFloat) -> None: ...
+    def _set_aspect(self, aspect: float) -> None: ...
+    def _set_near(self, near: float) -> None: ...
+    def _set_far(self, far: float) -> None: ...
 
     def set_type(
         self,
@@ -743,14 +752,14 @@ class CameraObject(Generic[TCameraType]):
     # Needed? @gangjeuk
     def _set_resolution(self): ...
     def _set_noise(self): ...
-    def _set_exposure(self, exposure: RandomizableFloat): ...
+    def _set_exposure(self, exposure: float): ...
 
     def look_at(
         self,
         target: Vec3 | AnchorRef | ColliderRef,
         *,
         up: Vec3 = (0, 0, 1),
-        offset: RandomizableVec3 = (0, 0, 0),
+        offset: Vec3 = (0, 0, 0),
     ) -> None:
         """Orient the camera toward a target point or reference."""
         if self._entity.id is None:
@@ -773,8 +782,8 @@ class CameraObject(Generic[TCameraType]):
         self,
         parent: AnchorRef,
         *,
-        offset: RandomizableVec3 = (0, 0, 0),
-        rot: RandomizableVec3 = (0, 0, 0),
+        offset: Vec3 = (0, 0, 0),
+        rot: Vec3 = (0, 0, 0),
     ) -> None:
         """Attach the camera to an anchor."""
         if self._entity.id is None:
@@ -793,7 +802,7 @@ class CameraObject(Generic[TCameraType]):
         self,
         target: AnchorRef | ColliderRef | RobotObject[Any] | StuffObject,
         *,
-        offset: RandomizableVec3 = (0, 0, 0),
+        offset: Vec3 = (0, 0, 0),
         frame: Literal["world", "local"] = "world",
     ) -> None:
         """Make the camera follow another object or reference."""

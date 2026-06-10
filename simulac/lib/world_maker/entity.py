@@ -17,6 +17,7 @@ from simulac.sdk.environment_service.common.model.entity import (
 )
 
 if TYPE_CHECKING:
+    from simulac.base.types.geometry import Vec3
     from simulac.sdk.environment_service.common.randomize import (
         RandomizableColor,
         RandomizableFloat,
@@ -71,13 +72,13 @@ class Camera(Generic[TCameraType]):
 
     def __init__(
         self,
-        type: TCameraType = "rgb",
+        type: "TCameraType" = "rgb",
         mode: CameraMode = "fixed",
-        lookat: Union[RandomizableVec3, tuple[float, float, float]] = (0, 0, 0),
-        fov: Union[RandomizableFloat, float] = 50.0,
-        aspect: Union[RandomizableFloat, float] = 1.0,
-        near: Union[RandomizableFloat, float] = 100.0,
-        far: Union[RandomizableFloat, float] = 1000.0,
+        lookat: Vec3 = (0, 0, 0),
+        fov: float = 50.0,
+        aspect: float = 1.0,
+        near: float = 100.0,
+        far: float = 1000.0,
     ):
         self.__spec = CameraSpec(type, mode, lookat, fov, aspect, near, far)
 

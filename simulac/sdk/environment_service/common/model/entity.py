@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Tuple
+from typing import TYPE_CHECKING, Generic, Literal, Tuple, cast
+
+from typing_extensions import TypeVar
 
 from simulac.sdk.environment_service.common.model.ref import PointRefType
 
 if TYPE_CHECKING:
+    from simulac.base.types.geometry import Vec3
     from simulac.sdk.environment_service.common.model.component import (
         RenderingComponent,
     )
@@ -172,11 +175,11 @@ type CameraMode = Literal["fixed", "track"]
 class CameraSpec(Generic[TCameraType]):
     type: TCameraType = cast(TCameraType, "rgb")
     mode: CameraMode = "track"
-    lookat: RandomizableVec3 = (0, 0, 0)
-    fov: RandomizableFloat = 50.0
-    aspect: RandomizableFloat = 1.0
-    near: RandomizableFloat = 100.0
-    far: RandomizableFloat = 1000.0
+    lookat: Vec3 = (0, 0, 0)
+    fov: float = 50.0
+    aspect: float = 1.0
+    near: float = 100.0
+    far: float = 1000.0
 
 
 @dataclass(slots=True)
@@ -184,8 +187,8 @@ class EnvironmentCameraEntity(Generic[TCameraType]):
     id: str | None = None
     description: str = ""
     spec: CameraSpec[TCameraType] = field(default_factory=CameraSpec)
-    pos: RandomizableVec3 = (0, 0, 0)
-    rot: RandomizableVec3 = (0, 0, 0)
+    pos: Vec3 | PointRefType = (0, 0, 0)
+    rot: Vec3 = (0, 0, 0)
 
     attach: AttachSpec | None = None
     look_at: LookAtSpec | None = None
