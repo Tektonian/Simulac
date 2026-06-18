@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.1.0 (2026-06-18)
+
+
+### Features
+
+* **base,sdk:** apply the runtime log level from environment variables ([31c05f4](https://github.com/Tektonian/Simulac/commit/31c05f4940dae775fce3b5f2b7dbe8e36e9c44e1))
+* **base:** improve instantiation service: cycle detection, creation tracing, and typing fixes ([#3](https://github.com/Tektonian/Simulac/issues/3)) ([f1e5858](https://github.com/Tektonian/Simulac/commit/f1e5858c6d206f0c919e6a2b997b00e8d92ea54e))
+* **base:** refactoring instantiate service code ([6039124](https://github.com/Tektonian/Simulac/commit/60391245ea61c92a22cb5e9e59c9377b984624c9))
+* **cli:** expand CLI commands and add runtime context ([#24](https://github.com/Tektonian/Simulac/issues/24)) ([79cfefb](https://github.com/Tektonian/Simulac/commit/79cfefb9dc035f7f93511f55d4cf557d0e607ed6))
+* **cli:** update cache directory location and improve CLI login/logout messages ([#13](https://github.com/Tektonian/Simulac/issues/13)) ([3074fc1](https://github.com/Tektonian/Simulac/commit/3074fc1222747e0db990b56b658035005b927b15))
+* **error:** defined base error class ([86c46c2](https://github.com/Tektonian/Simulac/commit/86c46c2a9eb705057ddfc9d070f2ffc76400526a))
+* **lib,sdk:** add camera runtime render API ([#48](https://github.com/Tektonian/Simulac/issues/48)) ([45f157f](https://github.com/Tektonian/Simulac/commit/45f157f757071f3a1a8b74acecab7337e26b9cf1))
+* **lib,sdk:** add mujoco native context access ([#44](https://github.com/Tektonian/Simulac/issues/44)) ([269bea5](https://github.com/Tektonian/Simulac/commit/269bea50e1c3e5c11613cb93ac9b13daa436ebd7))
+* **lib,sdk:** add object deletion ([#47](https://github.com/Tektonian/Simulac/issues/47)) ([37af6ef](https://github.com/Tektonian/Simulac/commit/37af6ef6b9c1789b207134db8d79fad56b814a5d))
+* **lib,sdk:** finalize API design and complete `mujoco` integration ([#40](https://github.com/Tektonian/Simulac/issues/40)) ([333e94f](https://github.com/Tektonian/Simulac/commit/333e94fdd7244cf501392fc30a39fc544b63ce61))
+* **lib,sdk:** fulfill object runtime APIs ([#46](https://github.com/Tektonian/Simulac/issues/46)) ([54d545b](https://github.com/Tektonian/Simulac/commit/54d545bf8ca8a08b8d401f7d9c54ac05c862fe1e))
+* **lib,sdk:** implement environment import and export ([#43](https://github.com/Tektonian/Simulac/issues/43)) ([c220ea2](https://github.com/Tektonian/Simulac/commit/c220ea2d5b4f88caedbf121f1faecfd9843d571e))
+* **lib,sdk:** implement light runtime APIs ([#49](https://github.com/Tektonian/Simulac/issues/49)) ([cdad679](https://github.com/Tektonian/Simulac/commit/cdad67953dea01eed08a47da46d47ac1881c204e))
+* **lib,sdk:** implement MuJoCo runtime object flow ([#31](https://github.com/Tektonian/Simulac/issues/31)) ([f1bd0bb](https://github.com/Tektonian/Simulac/commit/f1bd0bb77cb9811a49c5a2024e1c63ac0fb00b2a))
+* **lib,sdk:** integrate MuJoCo environment build and placement flow ([#28](https://github.com/Tektonian/Simulac/issues/28)) ([d541808](https://github.com/Tektonian/Simulac/commit/d5418088391fcc4067290687326a6ba229f30cf2))
+* **lib,sdk:** remove `set_density` of `Sutff` ([#45](https://github.com/Tektonian/Simulac/issues/45)) ([98e5eb6](https://github.com/Tektonian/Simulac/commit/98e5eb666922127716ace4c039cfe9ee3bc5a9f3))
+* **lib,sdk:** support fixed flag for MuJoCo stuff entities ([#39](https://github.com/Tektonian/Simulac/issues/39)) ([f04cee5](https://github.com/Tektonian/Simulac/commit/f04cee58292562f87cce2d56ab01c14d981f047e))
+* **lib:** add `BenchmarkEnvironment` error-recovery logic and recovery tests ([#29](https://github.com/Tektonian/Simulac/issues/29)) ([10758de](https://github.com/Tektonian/Simulac/commit/10758de74f987fde707588421b62080e212e5078))
+* **lib:** add new apis for articulated object and public interface for `*Runtime` ([#26](https://github.com/Tektonian/Simulac/issues/26)) ([7baf61e](https://github.com/Tektonian/Simulac/commit/7baf61ecc024747bfeacfbffc73e1b680c37b051))
+* **lib:** add scenario concept ([#50](https://github.com/Tektonian/Simulac/issues/50)) ([7683268](https://github.com/Tektonian/Simulac/commit/7683268db64d3bec4b0bb3112bfbd05af46e0241))
+* **lib:** added gym_style library module ([7579d38](https://github.com/Tektonian/Simulac/commit/7579d387ce73364dc7d406c93cd0d6af6f7839a0))
+* **lib:** align gym-style benchmark client with the updated remote protocol ([#16](https://github.com/Tektonian/Simulac/issues/16)) ([c875bdd](https://github.com/Tektonian/Simulac/commit/c875bdd6e3f90797ae652e8e8589d02533e53648))
+* **lib:** change gym env return type from `terminated, truncated` to `done` ([8faf1a2](https://github.com/Tektonian/Simulac/commit/8faf1a2846340e294da589bd62e7bce9b743440b))
+* **lib:** correct entity object role ([#15](https://github.com/Tektonian/Simulac/issues/15)) ([767d2c3](https://github.com/Tektonian/Simulac/commit/767d2c314c3da1817baac3cce7d9f2f140e98252))
+* **lib:** creat GymStyleEnvironment for gym alike benchmark ([3354e3e](https://github.com/Tektonian/Simulac/commit/3354e3ea443f66ecbdbf2b185e7c572d644f4d27))
+* **lib:** fix return type of gym_env step and reset function from dict to tuple ([e502cf0](https://github.com/Tektonian/Simulac/commit/e502cf0888aebaf51393ad7d50f8b59ca93f84b2))
+* **lib:** implement user-side constraint API ([#37](https://github.com/Tektonian/Simulac/issues/37)) ([de430c2](https://github.com/Tektonian/Simulac/commit/de430c29f604781ab90f8f3f3a65b8eebfdf2df7))
+* **lib:** implemented user side world making ([#7](https://github.com/Tektonian/Simulac/issues/7)) ([e5df48a](https://github.com/Tektonian/Simulac/commit/e5df48a1c162831bd6a595fe0544fa1904aecf5d))
+* **lib:** redefine world_maker interface and add randomization ([#25](https://github.com/Tektonian/Simulac/issues/25)) ([85f426a](https://github.com/Tektonian/Simulac/commit/85f426a5c3548332dfa2d2a53c14d6552ad2c294))
+* **lib:** reimplemented gym style environment for remote benchmark service ([#9](https://github.com/Tektonian/Simulac/issues/9)) ([dac79e2](https://github.com/Tektonian/Simulac/commit/dac79e2768c2f773d013358ad4170e5fb0b4e3e1))
+* **lib:** remove the group_id parameter from get_env_list ([6bd1db2](https://github.com/Tektonian/Simulac/commit/6bd1db26f66e61f828d9c5b618969a95edaea4ac))
+* **project:** change item to benchmark platform ([4ec4f23](https://github.com/Tektonian/Simulac/commit/4ec4f2324a48c514d3621688dd03ca55820ce726))
+* **project:** changed project name 'tt' to 'simulac' ([#11](https://github.com/Tektonian/Simulac/issues/11)) ([efdd23b](https://github.com/Tektonian/Simulac/commit/efdd23bfc2f3041296096dab43be3c6002534c87))
+* **project:** prepare 0.0.1 release ([#18](https://github.com/Tektonian/Simulac/issues/18)) ([184768f](https://github.com/Tektonian/Simulac/commit/184768f25b07f3851c9a6be222a33e636294aea5))
+* **project:** preparing for v0.0.1 pre-alpha release ([#10](https://github.com/Tektonian/Simulac/issues/10)) ([21ef18f](https://github.com/Tektonian/Simulac/commit/21ef18f3201ccc872ede0ec46fd2d16324503d03))
+* **sdk,lib:** add libero style fields -&gt; Will be change later ([e4929c0](https://github.com/Tektonian/Simulac/commit/e4929c017055115b4f2214fb1ba2d6c473552fb4))
+* **sdk,lib:** add unified add_entity flow for MuJoCo environments ([#27](https://github.com/Tektonian/Simulac/issues/27)) ([57a2f80](https://github.com/Tektonian/Simulac/commit/57a2f803154a26998d7ec4cb175e948076759f8c))
+* **sdk:** add MuJoCo placement resolver for surface sampling ([#36](https://github.com/Tektonian/Simulac/issues/36)) ([042473e](https://github.com/Tektonian/Simulac/commit/042473e6637ee9bd7b71908c428c5de363aef44f))
+* **sdk:** add scene constraints and constraint checker for`MujocoRunner`  ([#35](https://github.com/Tektonian/Simulac/issues/35)) ([9da1651](https://github.com/Tektonian/Simulac/commit/9da16514443c445bf017f44483c5ef93489b4ed1))
+* **sdk:** create default service classes ([65169f2](https://github.com/Tektonian/Simulac/commit/65169f2da6039744091a03d1d03213a79d0da44e))
+* **sdk:** implement `AssetService` for doing parse, resolve, and download asset ([#42](https://github.com/Tektonian/Simulac/issues/42)) ([de25e40](https://github.com/Tektonian/Simulac/commit/de25e4083b2df4686be8cebe75692adaa92e7767))
+* **sdk:** implement `IFileService`  and register 'https:' and 'file:' provider ([#41](https://github.com/Tektonian/Simulac/issues/41)) ([a5e5b09](https://github.com/Tektonian/Simulac/commit/a5e5b09540a67499fb84dd2ad2394603d400e2e4))
+* **sdk:** implement `RobotRuntime` and `CameraRuntime` ([#33](https://github.com/Tektonian/Simulac/issues/33)) ([d9efb8e](https://github.com/Tektonian/Simulac/commit/d9efb8eaa8187a74c72814ef34dc9aaa07555c55))
+* **sdk:** Implement environment builder and adapter pattern for SDK ([#2](https://github.com/Tektonian/Simulac/issues/2)) ([8d74e5c](https://github.com/Tektonian/Simulac/commit/8d74e5c7cd65cbcc732f291d563413c4333fa527))
+* **sdk:** implemented remote runner for benchmark ([a2500b8](https://github.com/Tektonian/Simulac/commit/a2500b847dad22d0c9ea5551387de27c60f828d2))
+* **sdk:** integrate `mujoco` runner runtime and `StuffRuntime` ([#32](https://github.com/Tektonian/Simulac/issues/32)) ([e5b3159](https://github.com/Tektonian/Simulac/commit/e5b315981181299c0f0096fbff0f4e4bbf0da454))
+* **sdk:** newton adapter can handle multiple runners ([#6](https://github.com/Tektonian/Simulac/issues/6)) ([8fd3436](https://github.com/Tektonian/Simulac/commit/8fd343613162b423af30f386225cebce72e87100))
+* **sdk:** packages for telemetry, log added ([0b3fcf6](https://github.com/Tektonian/Simulac/commit/0b3fcf673b35d506479b007b07d0ea7724516907))
+* **sdk:** seperate env class to env, world, simul, runner classes ([83e90bc](https://github.com/Tektonian/Simulac/commit/83e90bcca4ba2ea870bed04b8198a56e3eb949d8))
+
+
+### Bug Fixes
+
+* **base:** fix multiple instants creation bug ([4dccb7f](https://github.com/Tektonian/Simulac/commit/4dccb7f88510ba24e134419e9539402a1928cd1a))
+* **lib,sdk:** allow point refs in `add_entity()` position typing ([#38](https://github.com/Tektonian/Simulac/issues/38)) ([9484499](https://github.com/Tektonian/Simulac/commit/94844997f7276a1a5223c072c71c13d27b82d283))
+* **lib:** fixed library error code ([#14](https://github.com/Tektonian/Simulac/issues/14)) ([fd9bcea](https://github.com/Tektonian/Simulac/commit/fd9bcea6da49d57699dd40121c81d0a62e78a636))
+* **project:** add missed `requests` package ([0fd6fc1](https://github.com/Tektonian/Simulac/commit/0fd6fc1fd098df429ba44bbf042e67166e602b46))
+* **sdk:** fix missing light_bindings on mujoco runner and context ([#52](https://github.com/Tektonian/Simulac/issues/52)) ([3a42eca](https://github.com/Tektonian/Simulac/commit/3a42eca998b6ad7d55c4fdfcca1b4c4b082c356c))
+* **sdk:** fix typing of `TelemetryService` ([8803a42](https://github.com/Tektonian/Simulac/commit/8803a4282969217687f9096206e9f948a4dc01a0))
+* **sdk:** generate entity_id of world maker from correct entities ([#22](https://github.com/Tektonian/Simulac/issues/22)) ([26a6594](https://github.com/Tektonian/Simulac/commit/26a65940aac7fdc037a6c3583a108f924a907b03))
+
+
+### Documentation
+
+* **project:** add `eval_libero_smolvla.py` example code ([c481b68](https://github.com/Tektonian/Simulac/commit/c481b68ea488b25ac3e0de2540673ca7ccb6509b))
+* **project:** update docs ([2d3b94f](https://github.com/Tektonian/Simulac/commit/2d3b94f3d9481a6dda89b04b7b891c836c077381))
+
 ## 0.1.0 (2026-06-07)
 
 - User side APIs are fully implemented🔥
